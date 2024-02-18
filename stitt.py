@@ -3,10 +3,12 @@ import torch.nn as nn
 import torch_geometric as pyg
 import scipy.sparse as sp
 
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Iterable
 
 
-def get_laplacian_eig(graph: pyg.data.Data, normalization:Optional[str]=None) -> Tuple[torch.Tensor, torch.Tensor]:
+def get_laplacian_eig(
+    graph: pyg.data.Data, normalization: Optional[str] = None
+) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Compute the eigenvalues and eigenvectors of the normalized Laplacian matrix of a graph.
 
@@ -18,9 +20,7 @@ def get_laplacian_eig(graph: pyg.data.Data, normalization:Optional[str]=None) ->
       tuple: A tuple containing the sorted eigenvalues and eigenvectors of the normalized Laplacian matrix.
     """
 
-    laplacian = pyg.utils.get_laplacian(
-        graph.edge_index, normalization=normalization
-    )
+    laplacian = pyg.utils.get_laplacian(graph.edge_index, normalization=normalization)
     row, col = laplacian[0]
     sparse_lap = sp.coo_matrix(
         (laplacian[1], (row, col)), (graph.num_nodes, graph.num_nodes)
@@ -40,6 +40,7 @@ def get_laplacian_eig(graph: pyg.data.Data, normalization:Optional[str]=None) ->
     eigenvectors = eigenvectors[:, sorted_indices]
 
     return eigenvalues, eigenvectors
+
 
 class RMSNorm(nn.Module):
     def __init__(self, feature_dim: int, eps=1e-8):
@@ -72,7 +73,9 @@ class AttentionHead(nn.Module):
         self.W_V = nn.Linear(d_input, n_hidden)
         self.n_hidden = n_hidden
 
-    def forward(self, x: torch.Tensor, attn_mask: Optional[torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self, x: torch.Tensor, attn_mask: Optional[torch.Tensor]
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Computes the forward pass of the attention head.
 
@@ -100,17 +103,16 @@ class AttentionHead(nn.Module):
 
         # Compute masked attention scores, if mask is provided
         if attn_mask is not None:
-          masked_attention = torch.where(attn_mask == 1, 
-                                         attention_scores,
-                                         -torch.inf)
-          # masked_attention = attention_scores * attn_mask
-          attn_score = nn.functional.softmax(masked_attention, dim=-1)
+            masked_attention = torch.where(attn_mask == 1, attention_scores, -torch.inf)
+            # masked_attention = attention_scores * attn_mask
+            attn_score = nn.functional.softmax(masked_attention, dim=-1)
         else:
-          attn_score = nn.functional.softmax(attention_scores, dim=-1)
-        
+            attn_score = nn.functional.softmax(attention_scores, dim=-1)
+
         attn_output = attn_score @ V
 
         return attn_output, attn_score
+
 
 class MultiheadAttention(nn.Module):
     def __init__(self, d_input: int, n_hidden: int, num_heads: int):
@@ -132,12 +134,15 @@ class MultiheadAttention(nn.Module):
         self.d_input = d_input
         self.n_hidden = n_hidden
         self.num_heads = num_heads
-        
+
         self.attention_heads = nn.ModuleList(
-          [AttentionHead(d_input, n_hidden) for _ in range(num_heads)])
+            [AttentionHead(d_input, n_hidden) for _ in range(num_heads)]
+        )
         self.W_proj = nn.Linear(n_hidden * num_heads, d_input)
 
-    def forward(self, x: torch.Tensor, attn_mask: Optional[torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self, x: torch.Tensor, attn_mask: Optional[torch.Tensor]
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Executes the forward pass of the multi-head attention mechanism.
 
@@ -160,29 +165,33 @@ class MultiheadAttention(nn.Module):
         attn_output, attn_scores = None, None
 
         # Assuming all inputs are of the correct shape, not verifying
-        
+
         scores = []
         attns = []
-        
+
         # Sequentially apply each attention head
         for i, head in enumerate(self.attention_heads):
-          head_output, head_scores = head(x, attn_mask) # if attn_mask is None, it will be ignored
-          scores.append(head_scores)
-          attns.append(head_output)
-            
+            head_output, head_scores = head(
+                x, attn_mask
+            )  # if attn_mask is None, it will be ignored
+            scores.append(head_scores)
+            attns.append(head_output)
+
         # Project the concatenated outputs back to the original dimension
         attns = torch.cat(attns, dim=-1)
         attn_output = self.W_proj(attn_output)
-        
+
         attn_scores = torch.stack(scores, dim=1)
-        
+
         return attn_output, attn_scores
-      
+
+
 # FFN class is alreay implemented for you
 class FFN(nn.Module):
     """
     This class represents a Feed-Forward Network (FFN) layer.
     """
+
     def __init__(self, d_input: int, n_hidden: int):
         """
         Args:
@@ -199,7 +208,7 @@ class FFN(nn.Module):
             nn.Linear(n_hidden, d_input),
         )
 
-    def forward(self, x: torch.Tensor)-> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Executes the forward pass of the FFN.
 
@@ -216,6 +225,7 @@ class TransformerBlock(nn.Module):
     """
     This class represents a Transformer block.
     """
+
     def __init__(self, d_input: int, attn_dim: int, mlp_dim: int, num_heads: int):
         """
         Args:
@@ -235,15 +245,17 @@ class TransformerBlock(nn.Module):
         self.attn_dim = attn_dim
         self.mlp_dim = mlp_dim
         self.num_heads = num_heads
-        
+
         self.rmsnorm1 = RMSNorm(attn_dim)
         self.rmsnorm2 = RMSNorm(mlp_dim)
         self.attention = MultiheadAttention(d_input, attn_dim, num_heads)
         self.ffn = FFN(d_input, mlp_dim)
 
-    def forward(self, x: torch.Tensor, attn_mask: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self, x: torch.Tensor, attn_mask: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Executes the forward pass of the Transformer block.
+        Executes the forward pass of the Transformer block with pre RMSnorm.
 
         Args:
             x (torch.Tensor): The input tensor. Shape: (batch_size, seq_length, d_input)
@@ -257,7 +269,7 @@ class TransformerBlock(nn.Module):
             x (torch.Tensor): The output tensor after passing through the Transformer block. Shape: (batch_size, seq_length, d_input)
             attn_scores (torch.Tensor): The attention weights of each of the attention heads. Shape: (batch_size, num_heads, seq_length, seq_length)
         """
-        
+
         attended_values, attention_weights = self.self_attention(x)
         normalized1 = self.rmsnorm1(attended_values)
         residual1 = x + normalized1
