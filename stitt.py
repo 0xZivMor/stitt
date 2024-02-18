@@ -282,3 +282,76 @@ class TransformerBlock(nn.Module):
             return residual2, attention_weights
         else:
             return residual2
+
+
+class Stitt(nn.Module):
+  """
+  Stitt module for graph processing.
+
+  Args:
+    node_features (int): Number of input node features.
+    d_input (int): Dimension of the input embeddings.
+    d_attn (int): Dimension of the attention embeddings.
+    d_ffn (int): Dimension of the feed-forward network embeddings.
+    num_heads (int): Number of attention heads.
+    n_layers (int): Number of transformer blocks.
+
+  Attributes:
+    n_features (int): Number of node features.
+    d_input (int): Dimension of the input embeddings.
+    features_embed (nn.Linear): Linear layer for embedding node features.
+    geometric_embed (nn.Linear): Linear layer for embedding geometric features.
+    transformer_blocks (nn.ModuleList): List of transformer blocks.
+
+  """
+
+  def __init__(self, node_features, d_input, d_attn, d_ffn, num_heads, n_layers):
+    super(Stitt, self).__init__()
+
+    self.n_features = node_features
+    self.d_input = d_input
+
+    self.features_embed = nn.Linear(node_features, d_input)
+    self.geometric_embed = nn.Linear(d_input, d_input)
+
+    self.transformer_blocks = nn.ModuleList(
+      [
+        TransformerBlock(d_input, d_attn, d_ffn, num_heads)
+        for _ in range(n_layers)
+      ]
+    )
+
+  def forward(self, features_batch: torch.Tensor, eigvects_batch=torch.Tensor) -> torch.Tensor:
+    """
+    Forward pass of the Stitt module.
+
+    Args:
+      features_batch (torch.Tensor): Batch of input node features.
+      eigvects_batch (torch.Tensor): Batch of input eigenvectors.
+
+    Returns:
+      torch.Tensor: Output tensor after passing through the Stitt module.
+
+    Raises:
+      ValueError: If the number of graphs and eigenvectors in the batch are not the same.
+
+    """
+
+    # batches should have the same size
+    if features_batch.size(0) != eigvects_batch.size(0):
+      raise ValueError("Must have the same number of graphs and eigenvectors")
+    
+    embedded_features = self.features_embed(features_batch)
+
+    # Pad eigvects_batch with zeros up to the maximum graph size
+    padded = torch.zeros((eigvects_batch.size(0),
+               eigvects_batch.size(1),
+               self.d_input, self.d_input))
+    padded[:, :, :eigvects_batch.size(2), :eigvects_batch.size(3)] = eigvects_batch
+    embedded_geometrics = self.geometric_embed(padded.detach())
+
+    x = embedded_features + embedded_geometrics
+
+    for block in self.transformer_blocks:
+      x = block()
+    return x
