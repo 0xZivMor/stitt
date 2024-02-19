@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch_geometric as pyg
 import scipy.sparse as sp
+from ogb.graphproppred.mol_encoder import AtomEncoder
 
 from typing import Tuple, Optional, Iterable
 
@@ -60,7 +61,7 @@ class FFN(nn.Module):
     This class represents a Feed-Forward Network (FFN) layer.
     """
 
-    def __init__(self, d_input: int, n_hidden: int):
+    def __init__(self, d_input: int, n_hidden: int, d_out: Optional[int]=None):
         """
         Args:
             d_input (int): The dimension of the input.
@@ -70,10 +71,13 @@ class FFN(nn.Module):
         """
 
         super().__init__()
+        if d_out is None:
+          d_out = d_input
+        
         self.ffn = nn.Sequential(
             nn.Linear(d_input, n_hidden),
             nn.GELU(),
-            nn.Linear(n_hidden, d_input),
+            nn.Linear(n_hidden, d_out),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -152,6 +156,8 @@ class TransformerBlock(nn.Module):
             return residual2
 
 
+
+
 class Stitt(nn.Module):
   """
   Stitt module for graph processing.
@@ -159,7 +165,7 @@ class Stitt(nn.Module):
   Args:
     node_features (int): Number of input node features.
     d_input (int): Dimension of the input embeddings.
-    d_attn (int): Dimension of the attention embeddings.
+    d_attn (int): Dimension of the attention embeddings. Also, maximum size of input graph
     d_ffn (int): Dimension of the feed-forward network embeddings.
     num_heads (int): Number of attention heads.
     n_layers (int): Number of transformer blocks.
@@ -179,7 +185,7 @@ class Stitt(nn.Module):
     self.n_features = node_features
     self.d_input = d_input
 
-    self.features_embed = nn.Linear(node_features, d_input)
+    self.features_embed = AtomEncoder(emb_dim=d_input)
     self.geometric_embed = nn.Linear(d_input, d_input)
 
     self.transformer_blocks = nn.ModuleList(
@@ -223,3 +229,14 @@ class Stitt(nn.Module):
     for block in self.transformer_blocks:
       x = block()
     return x
+
+
+class LinkPredictorTrainer(nn.Module):
+  
+  def __init__(self, stitt: Stitt, d_input: int, n_heads: int, n_hidden: int,
+               *args, **kwargs) -> None:
+      super().__init__(*args, **kwargs)
+      self.stitt = stitt
+      self.crossattn = nn.MultiheadAttention()
+      
+      self.ffn = FFN(d_input * n_heads, n_hidden, 2)
