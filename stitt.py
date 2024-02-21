@@ -61,7 +61,7 @@ class FFN(nn.Module):
     This class represents a Feed-Forward Network (FFN) layer.
     """
 
-    def __init__(self, d_input: int, n_hidden: int, d_out: Optional[int]=None):
+    def __init__(self, d_input: int, n_hidden: int, d_out: Optional[int] = None):
         """
         Args:
             d_input (int): The dimension of the input.
@@ -72,8 +72,8 @@ class FFN(nn.Module):
 
         super().__init__()
         if d_out is None:
-          d_out = d_input
-        
+            d_out = d_input
+
         self.ffn = nn.Sequential(
             nn.Linear(d_input, n_hidden),
             nn.GELU(),
@@ -96,22 +96,21 @@ class FFN(nn.Module):
 class TransformerBlock(nn.Module):
     """
     This class represents a Transformer block.
+
+    Args:
+      d_input (int): The dimension of the input.
+      attn_dim (int): The hidden dimension for the attention layer.
+      mlp_dim (int): The hidden dimension for the FFN.
+      num_heads (int): The number of attention heads.
+
+    Attributes:
+      rmsnomr1: The first layer normalization layer for the attention.
+      rmsnorm2: The second layer normalization layer for the FFN.
+      attention (MultiheadAttention): The multi-head attention mechanism.
+      ffn (FFN): The feed-forward network.
     """
 
     def __init__(self, d_input: int, attn_dim: int, mlp_dim: int, num_heads: int):
-        """
-        Args:
-            d_input (int): The dimension of the input.
-            attn_dim (int): The hidden dimension for the attention layer.
-            mlp_dim (int): The hidden dimension for the FFN.
-            num_heads (int): The number of attention heads.
-
-        Attributes:
-            layer_norm_1 (nn.LayerNorm): The first layer normalization layer for the attention.
-            layer_norm_2 (nn.LayerNorm): The second layer normalization layer for the FFN.
-            attention (MultiheadAttention): The multi-head attention mechanism.
-            ffn (FFN): The feed-forward network.
-        """
         super().__init__()
         self.d_input = d_input
         self.attn_dim = attn_dim
@@ -123,23 +122,16 @@ class TransformerBlock(nn.Module):
         self.attention = nn.MultiheadAttention(attn_dim, num_heads, batch_first=True)
         self.ffn = FFN(d_input, mlp_dim)
 
-    def forward(
-        self, x: torch.Tensor, attn_mask: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Executes the forward pass of the Transformer block with pre RMSnorm.
 
         Args:
-            x (torch.Tensor): The input tensor. Shape: (batch_size, seq_length, d_input)
-            attn_mask (torch.Tensor): The attention mask tensor. If provided, it serves as an attention guide
-            that specifies which tokens in the sequence should be attended to. It's a 3D tensor where the value at
-            position [b, i, j] is 1 if the token at position i in batch b should attend to the token at position j,
-            and 0 otherwise. If not provided (None), no specific attention pattern is enforced.
-            Shape: (batch_size, seq_length, seq_length)
+          x (torch.Tensor): The input tensor. Shape: (batch_size, seq_length, d_input)
 
         Returns:
-            x (torch.Tensor): The output tensor after passing through the Transformer block. Shape: (batch_size, seq_length, d_input)
-            attn_scores (torch.Tensor): The attention weights of each of the attention heads. Shape: (batch_size, num_heads, seq_length, seq_length)
+          x (torch.Tensor): The output tensor after passing through the Transformer block. Shape: (batch_size, seq_length, d_input)
+          attn_scores (torch.Tensor): The attention weights of each of the attention heads. Shape: (batch_size, num_heads, seq_length, seq_length)
         """
 
         attended_values, attention_weights = self.self_attention(x, x, x)
@@ -154,8 +146,6 @@ class TransformerBlock(nn.Module):
             return residual2, attention_weights
         else:
             return residual2
-
-
 
 
 class Stitt(nn.Module):
