@@ -149,49 +149,50 @@ class TransformerBlock(nn.Module):
 
 
 class Stitt(nn.Module):
-  """
-  Stitt module for graph processing.
-
-  Args:
-    node_features (int): Number of input node features.
-    d_input (int): Dimension of the input embeddings.
-    d_attn (int): Dimension of the attention embeddings. Also, maximum size of input graph
-    d_ffn (int): Dimension of the feed-forward network embeddings.
-    num_heads (int): Number of attention heads.
-    n_layers (int): Number of transformer blocks.
-
-  Attributes:
-    n_features (int): Number of node features.
-    d_input (int): Dimension of the input embeddings.
-    features_embed (nn.Linear): Linear layer for embedding node features.
-    geometric_embed (nn.Linear): Linear layer for embedding geometric features.
-    transformer_blocks (nn.ModuleList): List of transformer blocks.
-
-  """
-
-  def __init__(self, node_features, d_input, d_attn, d_ffn, num_heads, n_layers):
-    super(Stitt, self).__init__()
-
-    self.n_features = node_features
-    self.d_input = d_input
-
-    self.features_embed = AtomEncoder(emb_dim=d_input)
-    self.geometric_embed = nn.Linear(d_input, d_input)
-
-    self.transformer_blocks = nn.ModuleList(
-      [
-        TransformerBlock(d_input, d_attn, d_ffn, num_heads)
-        for _ in range(n_layers)
-      ]
-    )
-
-  def forward(self, features_batch: torch.Tensor, eigvects_batch=torch.Tensor) -> torch.Tensor:
     """
-    Forward pass of the Stitt module.
+    Stitt module for graph processing using transformer.
 
     Args:
-      features_batch (torch.Tensor): Batch of input node features.
-      eigvects_batch (torch.Tensor): Batch of input eigenvectors.
+      d_input (int): Dimension of the input embeddings.
+      d_attn (int): Dimension of the attention embeddings. Also, maximum size of input graph.
+      d_ffn (int): Dimension of the feed-forward network embeddings.
+      num_heads (int): Number of attention heads.
+      n_layers (int): Number of transformer blocks.
+      node_features (Optional[int]): Number of input node features. Default is 0.
+
+    Attributes:
+      n_features (int): Number of node features.
+      d_input (int): Dimension of the input embeddings.
+      features_embed (AtomEncoder): Linear layer for embedding node features.
+      geometric_embed (nn.Linear): Linear layer for embedding geometric features.
+      transformer_blocks (nn.ModuleList): List of transformer blocks.
+
+    """
+
+    def __init__(
+        self,
+        d_input: int,
+        d_attn: int,
+        d_ffn: int,
+        num_heads: int,
+        n_layers: int,
+        node_features: Optional[int] = 0,
+    ):
+        super(Stitt, self).__init__()
+
+        self.n_features = node_features
+        self.d_input = d_input
+
+        self.features_embed = AtomEncoder(emb_dim=d_input)
+        self.geometric_embed = nn.Linear(d_input, d_input)
+
+        self.transformer_blocks = nn.ModuleList(
+            [
+                TransformerBlock(d_input, d_attn, d_ffn, num_heads)
+                for _ in range(n_layers)
+            ]
+        )
+        
 
     Returns:
       torch.Tensor: Output tensor after passing through the Stitt module.
