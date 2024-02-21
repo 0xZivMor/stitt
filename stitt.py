@@ -166,6 +166,13 @@ class Stitt(nn.Module):
       features_embed (AtomEncoder): Linear layer for embedding node features.
       geometric_embed (nn.Linear): Linear layer for embedding geometric features.
       transformer_blocks (nn.ModuleList): List of transformer blocks.
+      
+    Returns:
+      torch.Tensor: Output tensor after passing through the Stitt module.
+
+    Raises:
+      ValueError: If the number of graphs and eigenvectors in the batch are not the same.
+
 
     """
 
@@ -194,40 +201,37 @@ class Stitt(nn.Module):
         )
         
 
-    Returns:
-      torch.Tensor: Output tensor after passing through the Stitt module.
-
-    Raises:
-      ValueError: If the number of graphs and eigenvectors in the batch are not the same.
-
-    """
-
-    # batches should have the same size
-    if features_batch.size(0) != eigvects_batch.size(0):
-      raise ValueError("Must have the same number of graphs and eigenvectors")
     
-    embedded_features = self.features_embed(features_batch)
+    def forward(self, features_batch: torch.Tensor, eigvects_batch: torch.Tensor) -> torch.Tensor:
+        # batches should have the same size
+        if features_batch.size(0) != eigvects_batch.size(0):
+          raise ValueError("Must have the same number of graphs and eigenvectors")
+        
+        embedded_features = self.features_embed(features_batch)
 
-    # Pad eigvects_batch with zeros up to the maximum graph size
-    padded = torch.zeros((eigvects_batch.size(0),
-               eigvects_batch.size(1),
-               self.d_input, self.d_input))
-    padded[:, :, :eigvects_batch.size(2), :eigvects_batch.size(3)] = eigvects_batch
-    embedded_geometrics = self.geometric_embed(padded.detach())
+        # Pad eigvects_batch with zeros up to the maximum graph size
+        padded = torch.zeros((eigvects_batch.size(0),
+                  eigvects_batch.size(1),
+                  self.d_input, self.d_input))
+        padded[:, :, :eigvects_batch.size(2), :eigvects_batch.size(3)] = eigvects_batch
+        embedded_geometrics = self.geometric_embed(padded.detach())
 
-    x = embedded_features + embedded_geometrics
+        x = embedded_features + embedded_geometrics
 
-    for block in self.transformer_blocks:
-      x = block()
-    return x
+        for block in self.transformer_blocks:
+          x = block()
+        return x
 
 
-class LinkPredictorTrainer(nn.Module):
+class StittGraphClassifier(nn.Module):
   
-  def __init__(self, stitt: Stitt, d_input: int, n_heads: int, n_hidden: int,
-               *args, **kwargs) -> None:
+  def __init__(self, d_input: int, d_attn: int,  n_heads: int, d_ffn: int, n_layers: int, n_classes: int,
+               *args, **kwargs):
       super().__init__(*args, **kwargs)
-      self.stitt = stitt
-      self.crossattn = nn.MultiheadAttention()
+      self.stitt = Stitt(d_input, d_attn, d_ffn, n_heads, n_layers)
+      self.classifier = nn.Linear(d_input, n_classes)
       
-      self.ffn = FFN(d_input * n_heads, n_hidden, 2)
+  def forward(self, features_batch: torch.Tensor, eigvects_batch: torch.Tensor) -> torch.Tensor:
+    
+    x = self.stitt(features_batch, eigvects_batch)
+    return self.classifier(x) 
