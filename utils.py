@@ -6,6 +6,7 @@ from typing import Tuple, Optional
 from tqdm import tqdm
 
 from torch.utils.data import Dataset
+from torch.nn.utils.rnn import pad_sequence
 
 def get_laplacian_eig(
     graph: pyg.data.Data, normalization: Optional[str] = None
@@ -54,46 +55,52 @@ class SpectralDataset(Dataset):
         return len(self.data)
 
 
-def create_spectral_dataset(dataset: pyg.data.Dataset, max_graph_size: Optional[int] = None) -> Dataset:
+def create_spectral_dataset(dataset: pyg.data.Dataset) -> Dataset:
     """
     Create a spectral dataset from a given PyTorch Geometric dataset. The dataset contains the node features and the graph's Laplacian eigenvector padded with zeros so all graphs in the dataset contain the same number of nodes. Attention mask can be used to differ between true and padded data.
     The created dataset ignores edges features.
+    IMPORTANT: When the dataset wrapped with a DataLoader, use the 
+    collate_spectral_dataset function as collate_fn. Data in the dataset
+    are not of the same size and require some processing (per batch).
 
     Args:
         dataset (pyg.data.Dataset): The input PyTorch Geometric dataset.
-        max_graph_size (Optional[int]): The maximum size of the graphs in the dataset. If not provided, it will be
-            determined as the maximum number of nodes among all graphs in the dataset.
 
     Returns:
         Dataset: The created spectral dataset in the following format:
         (padded graph nodes, padded eigenvectors, attention mask, label)
 
     """
-
-    # Determine the maximum graph size if not provided
-    if max_graph_size is None:
-        max_graph_size = max([graph.num_nodes for graph in dataset])
-
     data = []
+    
     for graph in tqdm(iter(dataset), total=len(dataset), desc="Creating Spectral Dataset"):
         # Compute the Laplacian eigenvectors for the graph
         _, eigenvects = get_laplacian_eig(graph)
 
-        # Pad the eigenvectors to match the maximum graph size
-        padded_eigenvects = torch.zeros(max_graph_size, max_graph_size)
-        padded_eigenvects[: eigenvects.size(0), : eigenvects.size(1)] = eigenvects
-
-        # Pad the node features to match the maximum graph size
-        node_features = graph.x
-        padding = torch.zeros(max_graph_size - graph.num_nodes, node_features.size(1))
-        node_features = torch.cat([graph.x, padding], dim=0)
-
-        # Get the label and create the attention mask
-        label = graph.y
-        attention_mask = torch.zeros(max_graph_size)
-        attention_mask[:graph.num_nodes] = 1
-
-        # Append the data tuple to the list
-        data.append((node_features, padded_eigenvects, attention_mask, label))
+        data.append((graph.x, eigenvects, graph.y, graph.num_nodes))
 
     return SpectralDataset(data)
+
+def collate_spectral_dataset(batch):
+    
+    # Separate the sequences, labels, and attention masks
+    node_features, eigenvectors, labels, num_nodes = zip(*batch)
+    
+    max_graph = max(num_nodes)
+    
+    # Pad the sequences with zeros
+    padded_node_features = pad_sequence(node_features, batch_first=True, padding_value=0)
+    
+    # Pad the eigenvectors with zeros
+    padded_eigenvectors = torch.zeros((len(batch), max_graph, max_graph))
+    for i, ev in enumerate(eigenvectors):
+        padded_eigenvectors[i, :ev.size(0), :ev.size(1)] = ev
+    
+    # Pad the attention masks with zeros
+    attention_masks = torch.zeros((padded_node_features.size(0),
+                                   padded_node_features.size(1))).to(dtype=int)
+    for i, count in enumerate(num_nodes):
+        attention_masks[i, :count] = 1
+
+    return padded_node_features, padded_eigenvectors, attention_masks, torch.concat(labels)
+
