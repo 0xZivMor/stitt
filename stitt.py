@@ -192,7 +192,7 @@ class Stitt(nn.Module):
         x = x.unsqueeze(0)  # add batch dim
 
         for block in self.transformer_blocks:
-            x = block(x)
+            x = block(x, attn_mask)
         return x
 
 
