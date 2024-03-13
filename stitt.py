@@ -175,7 +175,13 @@ class Stitt(nn.Module):
         # expects features shape [Batch, V, features]
         # expects eigvects shape [Batch, V, V]
         # expects attn_mask shape [Batch, V]
-        embedded_features = self.features_embed(features)
+
+        embedded_features = []
+        
+        # embedding can't be don't parallely for some reason
+        for datum in features:
+            embedded_features.append(self.features_embed(datum))
+        embedded_features = torch.stack(embedded_features, dim=0)
 
         # Pad eigvects with zeros up to the maximum graph size
         padded = torch.zeros(eigvects.size(0), self.d_input, device=self._device)
