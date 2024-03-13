@@ -171,13 +171,10 @@ class Stitt(nn.Module):
             ]
         )
 
-    def forward(self, features: torch.Tensor, eigvects: torch.Tensor) -> torch.Tensor:
-        # expects features shape [V, features]
-        # expects eigvects shape [V, V]
-        # batches should have the same size
-        if features.size(0) != eigvects.size(0):
-            raise ValueError("Must have the same number of graphs and eigenvectors")
-
+    def forward(self, features: torch.Tensor, eigvects: torch.Tensor, attn_mask: torch.Tensor) -> torch.Tensor:
+        # expects features shape [Batch, V, features]
+        # expects eigvects shape [Batch, V, V]
+        # expects attn_mask shape [Batch, V]
         embedded_features = self.features_embed(features)
 
         # Pad eigvects with zeros up to the maximum graph size
