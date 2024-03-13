@@ -189,7 +189,6 @@ class Stitt(nn.Module):
         embedded_geometrics = self.geometric_embed(padded.detach())
 
         x = embedded_features + embedded_geometrics
-        x = x.unsqueeze(0)  # add batch dim
 
         for block in self.transformer_blocks:
             x = block(x, attn_mask)
