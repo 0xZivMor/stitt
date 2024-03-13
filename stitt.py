@@ -81,7 +81,7 @@ class TransformerBlock(nn.Module):
         self.rmsnorm1 = RMSNorm(attn_dim * num_heads)
         self.rmsnorm2 = RMSNorm(d_input)
         self.attention = nn.MultiheadAttention(
-            attn_dim * num_heads,
+            attn_dim,
             num_heads,
             batch_first=True,
             kdim=d_input,
@@ -89,7 +89,7 @@ class TransformerBlock(nn.Module):
         )
         self.ffn = FFN(d_input, mlp_dim)
 
-    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, x: torch.Tensor, attn_mask: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Executes the forward pass of the Transformer block with pre RMSnorm.
 
@@ -101,7 +101,7 @@ class TransformerBlock(nn.Module):
           attn_scores (torch.Tensor): The attention weights of each of the attention heads. Shape: (batch_size, num_heads, seq_length, seq_length)
         """
 
-        attended_values, attention_weights = self.attention(x, x, x)
+        attended_values, attention_weights = self.attention(x, x, x, mask=attn_mask)
         normalized1 = self.rmsnorm1(attended_values)
         residual1 = x + normalized1
 
