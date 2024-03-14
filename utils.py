@@ -73,8 +73,8 @@ def create_spectral_dataset(dataset: pyg.data.Dataset) -> Dataset:
     """
     data = []
     
+    # Iterate over each graph in the dataset
     for graph in tqdm(iter(dataset), total=len(dataset), desc="Creating Spectral Dataset"):
-        # Compute the Laplacian eigenvectors for the graph
         _, eigenvects = get_laplacian_eig(graph)
 
         data.append((graph.x, eigenvects, graph.y, graph.num_nodes))
@@ -82,25 +82,37 @@ def create_spectral_dataset(dataset: pyg.data.Dataset) -> Dataset:
     return SpectralDataset(data)
 
 def collate_spectral_dataset(batch):
+    """
+    Collates a batch of spectral datasets.
+
+    Args:
+        batch (list): A list of tuples containing the sequences, eigenvectors, labels, and number of nodes for each sample.
+
+    Returns:
+        tuple: A tuple containing the padded node features, padded eigenvectors, attention masks, and concatenated labels.
+    """
     
     # Separate the sequences, labels, and attention masks
     node_features, eigenvectors, labels, num_nodes = zip(*batch)
+    batch_size = len(batch)
     
     max_graph = max(num_nodes)
     
     # Pad the sequences with zeros
     padded_node_features = pad_sequence(node_features, batch_first=True, padding_value=0)
     
-    # Pad the eigenvectors with zeros
-    padded_eigenvectors = torch.zeros((len(batch), max_graph, max_graph))
+    # pad eigenvectors for batching
+    padded_eigenvectors = torch.zeros((batch_size, max_graph, max_graph))
     for i, ev in enumerate(eigenvectors):
         padded_eigenvectors[i, :ev.size(0), :ev.size(1)] = ev
     
-    # Pad the attention masks with zeros
-    attention_masks = torch.zeros((padded_node_features.size(0),
-                                   padded_node_features.size(1))).to(dtype=int)
+    # Define attention mask w.r.t padding
+    attention_masks = torch.zeros((batch_size,
+                                   max_graph,
+                                   max_graph))
     for i, count in enumerate(num_nodes):
-        attention_masks[i, :count] = 1
+        attention_masks[i, :count, :count] = 1
 
-    return padded_node_features, padded_eigenvectors, attention_masks, torch.concat(labels)
+    return (padded_node_features, padded_eigenvectors, 
+            attention_masks, torch.concat(labels))
 
