@@ -148,6 +148,7 @@ class Stitt(nn.Module):
         d_input: int,
         d_attn: int,
         d_ffn: int,
+        max_graph: int,
         num_heads: int,
         n_layers: int,
         device: torch.device,
@@ -160,9 +161,10 @@ class Stitt(nn.Module):
         self.n_features = node_features
         self.d_input = d_input
         self._device = device
+        self.max_graph = max_graph  # the maximum number of nodes in a graph the model will handle 
 
         self.features_embed = AtomEncoder(emb_dim=d_input)
-        self.geometric_embed = nn.Linear(d_input, d_input)
+        self.geometric_embed = nn.Linear(self.max_graph, d_input)
 
         self.transformer_blocks = nn.ModuleList(
             [
@@ -182,11 +184,14 @@ class Stitt(nn.Module):
         for datum in features:
             embedded_features.append(self.features_embed(datum))
         embedded_features = torch.stack(embedded_features, dim=0)
+        
+        # pad the eigenvectors to fit the expected shape
+        b, n, _ = eigvects.shape
+        padded_eigvects = torch.zeros((b, n, self.max_graph))
+        padded_eigvects[:, :, :n] = eigvects
 
-        # Pad eigvects with zeros up to the maximum graph size
-        padded = torch.zeros(eigvects.size(0), self.d_input, device=self._device)
-        padded[:, : eigvects.size(1)] = eigvects
-        embedded_geometrics = self.geometric_embed(padded.detach())
+        print(embedded_features.shape, padded_eigvects.shape)
+        embedded_geometrics = self.geometric_embed(padded_eigvects)
 
         x = embedded_features + embedded_geometrics
 
