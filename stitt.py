@@ -101,7 +101,7 @@ class TransformerBlock(nn.Module):
           attn_scores (torch.Tensor): The attention weights of each of the attention heads. Shape: (batch_size, num_heads, seq_length, seq_length)
         """
 
-        attended_values, attention_weights = self.attention(x, x, x, mask=attn_mask)
+        attended_values, attention_weights = self.attention(x, x, x, attn_mask=attn_mask)
         normalized1 = self.rmsnorm1(attended_values)
         residual1 = x + normalized1
 
