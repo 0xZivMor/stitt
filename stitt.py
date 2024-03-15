@@ -78,7 +78,7 @@ class TransformerBlock(nn.Module):
         self.num_heads = num_heads
         self.return_attention = return_attention
 
-        self.rmsnorm1 = RMSNorm(attn_dim * num_heads)
+        self.rmsnorm1 = RMSNorm(attn_dim)
         self.rmsnorm2 = RMSNorm(d_input)
         self.attention = nn.MultiheadAttention(
             attn_dim,
@@ -161,7 +161,8 @@ class Stitt(nn.Module):
         self.n_features = node_features
         self.d_input = d_input
         self._device = device
-        self.max_graph = max_graph  # the maximum number of nodes in a graph the model will handle 
+        self.max_graph = max_graph  # the maximum number of nodes in a graph the model will handle
+        self.num_heads = num_heads
 
         self.features_embed = AtomEncoder(emb_dim=d_input)
         self.geometric_embed = nn.Linear(self.max_graph, d_input)
@@ -190,10 +191,12 @@ class Stitt(nn.Module):
         padded_eigvects = torch.zeros((b, n, self.max_graph))
         padded_eigvects[:, :, :n] = eigvects
 
-        print(embedded_features.shape, padded_eigvects.shape)
         embedded_geometrics = self.geometric_embed(padded_eigvects)
 
         x = embedded_features + embedded_geometrics
+        
+        # make a copy of the attention mask for each head
+        attn_mask = torch.cat([attn_mask] * self.num_heads)
 
         for block in self.transformer_blocks:
             x = block(x, attn_mask)
