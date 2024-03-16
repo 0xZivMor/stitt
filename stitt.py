@@ -107,7 +107,7 @@ class TransformerBlock(nn.Module):
 
         ffn = self.ffn(residual1)
         normalized2 = self.rmsnorm2(ffn)
-        residual2 = normalized1 + normalized2
+        residual2 = residual1 + normalized2
 
         if self.return_attention:
             return residual2, attention_weights
