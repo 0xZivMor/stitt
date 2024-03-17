@@ -209,18 +209,25 @@ class StittGraphClassifier(nn.Module):
         self,
         d_input: int,
         d_attn: int,
-        n_heads: int,
         d_ffn: int,
+        max_graph:int,
+        n_heads: int,
         n_layers: int,
         n_classes: int,
+        device: torch.device,
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
-        self.stitt = Stitt(d_input, d_attn, d_ffn, n_heads, n_layers)
+        self.stitt = Stitt(d_input, d_attn, d_ffn, max_graph, n_heads, n_layers, device)
         self.classifier = nn.Linear(d_input, n_classes)
 
-    def forward(self, features: torch.Tensor, eigvects: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self,
+        features: torch.Tensor,
+        eigvects: torch.Tensor,
+        attn_mask: torch.Tensor,
+    ) -> torch.Tensor:
 
-        x = self.stitt(features, eigvects)
+        x = self.stitt(features, eigvects, attn_mask)
         return self.classifier(x)
