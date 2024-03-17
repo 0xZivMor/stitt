@@ -61,7 +61,7 @@ class TransformerBlock(nn.Module):
       d_input (int): The dimension of the input.
       attn_dim (int): The hidden dimension for the attention layer.
       mlp_dim (int): The hidden dimension for the FFN.
-      num_heads (int): The number of attention heads.
+      n_heads (int): The number of attention heads.
 
     Attributes:
       rmsnomr1: The first layer normalization layer for the attention.
@@ -70,19 +70,19 @@ class TransformerBlock(nn.Module):
       ffn (FFN): The feed-forward network.
     """
 
-    def __init__(self, d_input: int, attn_dim: int, mlp_dim: int, num_heads: int, return_attention: Optional[bool]=True):
+    def __init__(self, d_input: int, attn_dim: int, mlp_dim: int, n_heads: int, return_attention: Optional[bool]=True):
         super().__init__()
         self.d_input = d_input
         self.attn_dim = attn_dim
         self.mlp_dim = mlp_dim
-        self.num_heads = num_heads
+        self.n_heads = n_heads
         self.return_attention = return_attention
 
         self.rmsnorm1 = RMSNorm(attn_dim)
         self.rmsnorm2 = RMSNorm(d_input)
         self.attention = nn.MultiheadAttention(
             attn_dim,
-            num_heads,
+            n_heads,
             batch_first=True,
             kdim=d_input,
             vdim=d_input,
@@ -98,7 +98,7 @@ class TransformerBlock(nn.Module):
 
         Returns:
           x (torch.Tensor): The output tensor after passing through the Transformer block. Shape: (batch_size, seq_length, d_input)
-          attn_scores (torch.Tensor): The attention weights of each of the attention heads. Shape: (batch_size, num_heads, seq_length, seq_length)
+          attn_scores (torch.Tensor): The attention weights of each of the attention heads. Shape: (batch_size, n_heads, seq_length, seq_length)
         """
 
         attended_values, attention_weights = self.attention(x, x, x, attn_mask=attn_mask)
@@ -123,7 +123,7 @@ class Stitt(nn.Module):
       d_input (int): Dimension of the input embeddings.
       d_attn (int): Dimension of the attention embeddings. Also, maximum size of input graph.
       d_ffn (int): Dimension of the feed-forward network embeddings.
-      num_heads (int): Number of attention heads.
+      n_heads (int): Number of attention heads.
       n_layers (int): Number of transformer blocks.
       node_features (Optional[int]): Number of input node features. Default is 0.
 
@@ -149,7 +149,7 @@ class Stitt(nn.Module):
         d_attn: int,
         d_ffn: int,
         max_graph: int,
-        num_heads: int,
+        n_heads: int,
         n_layers: int,
         device: torch.device,
         node_features: Optional[int] = 0,
@@ -162,14 +162,14 @@ class Stitt(nn.Module):
         self.d_input = d_input
         self._device = device
         self.max_graph = max_graph  # the maximum number of nodes in a graph the model will handle
-        self.num_heads = num_heads
+        self.n_heads = n_heads
 
         self.features_embed = AtomEncoder(emb_dim=d_input)
         self.geometric_embed = nn.Linear(self.max_graph, d_input)
 
         self.transformer_blocks = nn.ModuleList(
             [
-                TransformerBlock(d_input, d_attn, d_ffn, num_heads, False)
+                TransformerBlock(d_input, d_attn, d_ffn, n_heads, False)
                 for _ in range(n_layers)
             ]
         )
@@ -196,7 +196,7 @@ class Stitt(nn.Module):
         x = embedded_features + embedded_geometrics
         
         # make a copy of the attention mask for each head
-        attn_mask = torch.cat([attn_mask] * self.num_heads)
+        attn_mask = torch.cat([attn_mask] * self.n_heads)
 
         for block in self.transformer_blocks:
             x = block(x, attn_mask)
