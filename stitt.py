@@ -194,9 +194,9 @@ class Stitt(nn.Module):
         embedded_geometrics = self.geometric_embed(padded_eigvects)
 
         x = embedded_features + embedded_geometrics
-        
-        # make a copy of the attention mask for each head
-        attn_mask = torch.cat([attn_mask] * self.n_heads)
+
+        # repeat the attention mask for each head
+        attn_mask = attn_mask.repeat(self.n_heads, 1, 1)
 
         for block in self.transformer_blocks:
             x = block(x, attn_mask)
