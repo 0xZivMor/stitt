@@ -8,6 +8,9 @@ from tqdm import tqdm
 from torch.utils.data import Dataset
 from torch.nn.utils.rnn import pad_sequence
 
+from torch.utils.tensorboard import SummaryWriter
+
+
 def get_laplacian_eig(
     graph: pyg.data.Data, normalization: Optional[str] = None
 ) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -78,7 +81,7 @@ def create_spectral_dataset(dataset: pyg.data.Dataset) -> Dataset:
         _, eigenvects = get_laplacian_eig(graph)
 
         data.append((graph.x, eigenvects, graph.y, graph.num_nodes))
-
+        
     return SpectralDataset(data)
 
 def collate_spectral_dataset(batch):
@@ -116,3 +119,46 @@ def collate_spectral_dataset(batch):
     return (padded_node_features, padded_eigenvectors, 
             attention_masks, torch.concat(labels).flatten())
 
+
+class Trainer(object):
+    def __init__(self, model, optimizer, scheduler, criterion, device):
+        self.model = model
+        self.optimizer = optimizer
+        self.scheduler = scheduler
+        self.criterion = criterion
+        self.device = device
+        self.writer = SummaryWriter()  # Create a SummaryWriter for TensorBoard logging
+
+    def train(self, train_loader, num_epochs):
+        self.model.train()  # Set the model to training mode
+        total_steps = 0
+
+        for epoch in range(num_epochs):
+            for i, (features, eigvects, attn_mask, labels) in enumerate(train_loader):
+                features = features.to(self.device)
+                eigvects = eigvects.to(self.device)
+                attn_mask = attn_mask.to(self.device)
+                labels = labels.to(self.device)
+                self.optimizer.zero_grad()
+
+                # Forward pass
+                outputs = self.model(features, eigvects, attn_mask)
+                loss = self.criterion(outputs, labels)
+
+                # Backward and optimize
+                loss.backward()
+                self.optimizer.step()
+                self.scheduler.step()
+
+                total_steps += 1
+
+                # Log the loss to TensorBoard
+                self.writer.add_scalar("Loss/train", loss.item(), total_steps)
+
+                # if (i + 1) % 100 == 0:
+                #     print(
+                #         f"Epoch [{epoch+1}/{num_epochs}], Step [{i+1}/{len(train_loader)}], Loss: {loss.item()}"
+                #     )
+        print(f"Epoch {epoch+1} completed")
+
+        self.writer.close()  # Close the SummaryWriter
