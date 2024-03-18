@@ -91,21 +91,21 @@ def collate_spectral_dataset(batch):
     Returns:
         tuple: A tuple containing the padded node features, padded eigenvectors, attention masks, and concatenated labels.
     """
-    
+
     # Separate the sequences, labels, and attention masks
     node_features, eigenvectors, labels, num_nodes = zip(*batch)
     batch_size = len(batch)
-    
+
     max_graph = max(num_nodes)
-    
+
     # Pad the sequences with zeros
     padded_node_features = pad_sequence(node_features, batch_first=True, padding_value=0)
-    
+
     # pad eigenvectors for batching
     padded_eigenvectors = torch.zeros((batch_size, max_graph, max_graph))
     for i, ev in enumerate(eigenvectors):
         padded_eigenvectors[i, :ev.size(0), :ev.size(1)] = ev
-    
+
     # Define attention mask w.r.t padding
     attention_masks = torch.zeros((batch_size,
                                    max_graph,
@@ -114,5 +114,5 @@ def collate_spectral_dataset(batch):
         attention_masks[i, :count, :count] = 1
 
     return (padded_node_features, padded_eigenvectors, 
-            attention_masks, torch.concat(labels))
+            attention_masks, torch.concat(labels).flatten())
 
