@@ -184,10 +184,10 @@ class Stitt(nn.Module):
         for datum in features:
             embedded_features.append(self.features_embed(datum))
         embedded_features = torch.stack(embedded_features, dim=0)
-
+        
         # pad the eigenvectors to fit the expected shape
         b, n, _ = eigvects.shape
-        padded_eigvects = torch.zeros((b, n, self.max_graph))
+        padded_eigvects = torch.zeros((b, n, self.max_graph)).to(device=self._device)
         padded_eigvects[:, :, :n] = eigvects
 
         embedded_geometrics = self.geometric_embed(padded_eigvects)
