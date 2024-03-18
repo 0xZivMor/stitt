@@ -4,7 +4,6 @@ from ogb.graphproppred.mol_encoder import AtomEncoder
 
 from typing import Tuple, Optional, Iterable
 
-
 class RMSNorm(nn.Module):
     def __init__(self, feature_dim: int, eps=1e-8):
         super().__init__()
@@ -156,7 +155,7 @@ class Stitt(nn.Module):
         *args,
         **kwargs,
     ):
-        super(Stitt, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         self.n_features = node_features
         self.d_input = d_input
@@ -180,12 +179,12 @@ class Stitt(nn.Module):
         # expects attn_mask shape [Batch, V]
 
         embedded_features = []
-        
+
         # embedding can't be don't parallely for some reason
         for datum in features:
             embedded_features.append(self.features_embed(datum))
         embedded_features = torch.stack(embedded_features, dim=0)
-        
+
         # pad the eigenvectors to fit the expected shape
         b, n, _ = eigvects.shape
         padded_eigvects = torch.zeros((b, n, self.max_graph))
@@ -230,4 +229,6 @@ class StittGraphClassifier(nn.Module):
     ) -> torch.Tensor:
 
         x = self.stitt(features, eigvects, attn_mask)
+        x = torch.mean(x, dim=1)
+        
         return self.classifier(x)
