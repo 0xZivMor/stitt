@@ -2,7 +2,7 @@ import torch
 import torch_geometric as pyg
 import scipy.sparse as sp
 
-from typing import Tuple, Optional
+from typing import Optional, Iterable, Tuple
 from tqdm import tqdm
 
 from torch.utils.data import Dataset
@@ -58,7 +58,7 @@ class SpectralDataset(Dataset):
         return len(self.data)
 
 
-def create_spectral_dataset(dataset: pyg.data.Dataset) -> Dataset:
+def create_spectral_dataset(dataset: pyg.data.Dataset, upsample: Optional[Iterable[int]] = None) -> Dataset:
     """
     Create a spectral dataset from a given PyTorch Geometric dataset. The dataset contains the node features and the graph's Laplacian eigenvector padded with zeros so all graphs in the dataset contain the same number of nodes. Attention mask can be used to differ between true and padded data.
     The created dataset ignores edges features.
@@ -69,19 +69,28 @@ def create_spectral_dataset(dataset: pyg.data.Dataset) -> Dataset:
     Args:
         dataset (pyg.data.Dataset): The input PyTorch Geometric dataset.
 
+        upsample (Optional[Iterable[int]], optional): An optional iterable specifying the number of times each graph should be upsampled. If provided, the function will create additional samples by permuting the graphs in the dataset. Defaults to None.
+
     Returns:
         Dataset: The created spectral dataset in the following format:
         (padded graph nodes, padded eigenvectors, attention mask, label)
 
     """
     data = []
-    
+
     # Iterate over each graph in the dataset
     for graph in tqdm(iter(dataset), total=len(dataset), desc="Creating Spectral Dataset"):
-        _, eigenvects = get_laplacian_eig(graph)
 
-        data.append((graph.x, eigenvects, graph.y, graph.num_nodes))
-        
+        if not upsample:
+            _, eigenvects = get_laplacian_eig(graph)
+            data.append((graph.x, eigenvects, graph.y, graph.num_nodes))
+        else:
+            # Upsample the graph based on the specified number of times
+            for _ in range(upsample[graph.y]):
+                permuted_graph = permute_graph(graph)
+                _, eigenvects = get_laplacian_eig(permuted_graph)
+                data.append((permuted_graph.x, eigenvects, graph.y, graph.num_nodes))
+
     return SpectralDataset(data)
 
 def collate_spectral_dataset(batch):
@@ -119,6 +128,50 @@ def collate_spectral_dataset(batch):
     return (padded_node_features, padded_eigenvectors, 
             attention_masks, torch.concat(labels).flatten())
 
+
+def permute_graph(graph: pyg.data.Data) -> pyg.data.Data:
+    """
+    Permutes the nodes of a given PyTorch Geometric graph.
+    
+    IMPORTANT: this method discards the original graph's edge features
+    and don't include them in the permutated graph.
+
+    Args:
+        graph (pyg.data.Data): The input graph.
+
+    Returns:
+        pyg.data.Data: The permuted graph.
+    """
+    perm = torch.randperm(graph.num_nodes)
+    
+    # Permute the node features
+    permuted_x = graph.x[perm]
+    # Permute the edge indices
+    
+    permuted_edge_index = permute_edge_index(graph.edge_index, perm)
+    # Create the permuted graph
+    permuted_graph = pyg.data.Data(x=permuted_x, y=graph.y, edge_index=permuted_edge_index)
+    return permuted_graph
+
+def permute_edge_index(edge_index: torch.Tensor, perm: torch.Tensor) -> torch.Tensor:
+    """
+    Permutes the edge indices of a given graph.
+
+    Args:
+        edge_index (torch.Tensor): The edge indices of the graph.
+        perm (torch.Tensor): The permutation indices.
+
+    Returns:
+        torch.Tensor: The permuted edge indices.
+    """
+    # Permute the row indices
+    permuted_row = perm[edge_index[0]]
+    # Permute the column indices
+    permuted_col = perm[edge_index[1]]
+    
+    # Create the permuted edge indices
+    permuted_edge_index = torch.stack([permuted_row, permuted_col], dim=0)
+    return permuted_edge_index
 
 class Trainer(object):
     def __init__(self, model, optimizer, scheduler, criterion, device):
@@ -159,6 +212,6 @@ class Trainer(object):
                 #     print(
                 #         f"Epoch [{epoch+1}/{num_epochs}], Step [{i+1}/{len(train_loader)}], Loss: {loss.item()}"
                 #     )
-        print(f"Epoch {epoch+1} completed")
+            print(f"Epoch {epoch+1} completed")
 
         self.writer.close()  # Close the SummaryWriter
