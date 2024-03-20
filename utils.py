@@ -128,6 +128,22 @@ def collate_spectral_dataset(batch):
     return (padded_node_features, padded_eigenvectors, 
             attention_masks, torch.concat(labels).flatten())
 
+def collate_spectral_dataset_no_eigenvects(batch):
+    """
+    Collates a spectral dataset without eigenvectors.
+
+    Args:
+        batch (list): A list of samples in the dataset.
+
+    Returns:
+        tuple: A tuple containing the collated dataset with zeroed eigenvectors, essentially providing no geometric information.
+    """
+    
+    collated = collate_spectral_dataset(batch)
+    
+    # Return the collated dataset without eigenvectors
+    return (collated[0], torch.zeros_like(collated[1]), collated[2], collated[3])
+
 
 def permute_graph(graph: pyg.data.Data) -> pyg.data.Data:
     """
