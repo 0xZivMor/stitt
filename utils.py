@@ -112,7 +112,7 @@ def create_spectral_dataset(dataset: pyg.data.Dataset, upsample: Optional[Iterab
     # Iterate over each graph in the dataset
     for graph in tqdm(iter(dataset), total=len(dataset), desc="Creating Spectral Dataset"):
 
-        if not upsample:
+        if not upsample or not all(upsample):
             _, eigenvects = get_laplacian_eig(graph)
             data.append((graph.x, eigenvects, graph.y, graph.num_nodes))
         else:
@@ -261,24 +261,50 @@ def permute_edge_index(edge_index: torch.Tensor, perm: torch.Tensor) -> torch.Te
     return permuted_edge_index
 
 class Trainer(object):
-    def __init__(self, model, optimizer, scheduler, criterion, device):
+    """
+    A class for training a model.
+
+    Args:
+        model (torch.nn.Module): The model to be trained.
+        optimizer (torch.optim.Optimizer): The optimizer used for training.
+        scheduler (torch.optim.lr_scheduler._LRScheduler): The learning rate scheduler.
+        criterion (torch.nn.Module): The loss function.
+        device (torch.device): The device to run the training on.
+        use_eigenvects (bool, optional): Whether to use eigenvectors in the training process. Defaults to True.
+    """
+
+    def __init__(self, model, optimizer, scheduler, criterion, device, experiment_name, use_eigenvects=True):
         self.model = model
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.criterion = criterion
         self.device = device
-        self.writer = SummaryWriter()  # Create a SummaryWriter for TensorBoard logging
+        self.use_eigenvects = use_eigenvects
+        self.writer = SummaryWriter(log_dir=f"runs/{experiment_name}")  # Create a SummaryWriter for TensorBoard logging
 
     def train(self, train_loader, num_epochs):
+        """
+        Trains the model.
+
+        Args:
+            train_loader (torch.utils.data.DataLoader): The data loader for training data.
+            num_epochs (int): The number of epochs to train for.
+        """
         self.model.train()  # Set the model to training mode
         total_steps = 0
 
         for epoch in range(num_epochs):
             for i, (features, eigvects, attn_mask, labels) in enumerate(train_loader):
                 features = features.to(self.device)
-                eigvects = eigvects.to(self.device)
                 attn_mask = attn_mask.to(self.device)
                 labels = labels.to(self.device)
+                
+                # Discard eigenvectors encoding if explicitly requested 
+                if self.use_eigenvects:
+                    eigvects = eigvects.to(self.device)
+                else:
+                    eigvects = torch.zeros_like(eigvects).to(self.device)
+                
                 self.optimizer.zero_grad()
 
                 # Forward pass
