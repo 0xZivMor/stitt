@@ -35,10 +35,15 @@ def main(args):
     lr = args.lr
     model_path = f"{args.name}.pt"
     upsample = args.upsample
+    checkpoint_interval = args.checkpoints
 
+    print("Training parameters:")
+    for arg in vars(args):
+        print(f"{arg}: {getattr(args, arg)}")
     print(f"max grpah: {max_graph}, device: {device}")
     train_spect_ds = create_spectral_dataset(dataset[idx["train"]], upsample=upsample)
-    print(len(train_spect_ds))
+    
+    
     model = StittGraphClassifier(
         d_input=d_input,
         d_attn=d_attn,
@@ -73,7 +78,8 @@ def main(args):
         scheduler=scheduler,
         criterion=criterion,
         device=device,
-        experiment_name=args.name
+        experiment_name=args.name,
+        checkpoint_interval=checkpoint_interval
     )
 
     trainer.train(train_loader, n_epochs)
@@ -92,10 +98,11 @@ if __name__ == "__main__":
     parser.add_argument('--warmup', type=float, default=0.1, help='Warmup ratio')
     parser.add_argument('--classes', type=int, default=2, help='Number of classes')
     parser.add_argument('--lr', type=float, default=5e-5, help='Learning rate')
-    parser.add_argument('--name', type=str, default="stitt_molhiv", help='Experiment name')
+    parser.add_argument('--name', type=str, default='stitt', help='Experiment name')
+    parser.add_argument('--checkpoints', type=int, default=0, help='Save model at intervals')
 
     args, unknown = parser.parse_known_args()
     parser.add_argument('--upsample', type=int, nargs=args.classes, default=[0] * args.classes)
-    args = parser.parse_args(unknown)
+    args = parser.parse_args(unknown, namespace=args)
     
     main(args)
