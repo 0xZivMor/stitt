@@ -5,7 +5,9 @@ import scipy.sparse as sp
 from typing import Optional, Iterable, Tuple
 from tqdm import tqdm
 
-from torch.utils.data import Dataset
+from ogb.graphproppred import Evaluator
+
+from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
 
 from torch.utils.tensorboard import SummaryWriter
@@ -260,6 +262,38 @@ def permute_edge_index(edge_index: torch.Tensor, perm: torch.Tensor) -> torch.Te
     permuted_edge_index = torch.stack([permuted_row, permuted_col], dim=0)
     return permuted_edge_index
 
+def evaluate_model(model: torch.nn.Module, dataset: Iterable, batch_size: Optional[int]=32):
+
+    device = torch.device("cuda")
+
+    val_loader = DataLoader(
+        dataset, batch_size=batch_size, collate_fn=collate_spectral_dataset
+    )
+    evaluator = Evaluator(name="ogbg-molhiv")
+    y_true = []
+    y_pred = []
+
+    with torch.no_grad():
+        for batch in tqdm(val_loader):
+            features, eigvects, mask, labels = batch
+            features = features.to(device)
+            eigvects = eigvects.to(device)
+            mask = mask.to(device)
+            labels = labels.to(device)
+
+            outputs = model(features, eigvects, mask)
+            predicted = torch.argmax(outputs, dim=1)
+
+            y_true.append(labels)
+            y_pred.append(predicted)
+
+    y_true = torch.concat(y_true).unsqueeze(1)
+    y_pred = torch.concat(y_pred).unsqueeze(1)
+
+    roc_auc = evaluator.eval({"y_true": y_true, "y_pred": y_pred})["rocauc"]
+    return roc_auc
+
+
 class Trainer(object):
     """
     A class for training a model.
@@ -273,7 +307,7 @@ class Trainer(object):
         use_eigenvects (bool, optional): Whether to use eigenvectors in the training process. Defaults to True.
     """
 
-    def __init__(self, model, optimizer, scheduler, criterion, device, experiment_name, use_eigenvects=True):
+    def __init__(self, model, optimizer, scheduler, criterion, device, experiment_name, use_eigenvects=True, checkpoint_interval=0):
         self.model = model
         self.optimizer = optimizer
         self.scheduler = scheduler
@@ -281,6 +315,8 @@ class Trainer(object):
         self.device = device
         self.use_eigenvects = use_eigenvects
         self.writer = SummaryWriter(log_dir=f"runs/{experiment_name}")  # Create a SummaryWriter for TensorBoard logging
+        self.experiment_name = experiment_name
+        self.checkpoint_interval = checkpoint_interval
 
     def train(self, train_loader, num_epochs):
         """
@@ -321,10 +357,10 @@ class Trainer(object):
                 # Log the loss to TensorBoard
                 self.writer.add_scalar("Loss/train", loss.item(), total_steps)
 
-                # if (i + 1) % 100 == 0:
-                #     print(
-                #         f"Epoch [{epoch+1}/{num_epochs}], Step [{i+1}/{len(train_loader)}], Loss: {loss.item()}"
-                #     )
+            if self.checkpoint_interval and (epoch + 1) % self.checkpoint_interval == 0:
+                torch.save(self.model, f"{self.experiment_name}_epoch{epoch+1}.pt")
+                print("Saved checkpoint")
             print(f"Epoch {epoch+1} completed")
+            
 
         self.writer.close()  # Close the SummaryWriter
