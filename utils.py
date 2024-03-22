@@ -330,10 +330,10 @@ class Trainer(object):
         total_steps = 0
 
         for epoch in range(num_epochs):
-            for i, (features, eigvects, attn_mask, labels) in enumerate(train_loader):
+            for features, eigvects, attn_mask, labels in tqdm(train_loader):
                 features = features.to(self.device)
                 attn_mask = attn_mask.to(self.device)
-                labels = labels.to(self.device)
+                labels = labels.flatten().to(self.device)
                 
                 # Discard eigenvectors encoding if explicitly requested 
                 if self.use_eigenvects:
