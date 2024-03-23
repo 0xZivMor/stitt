@@ -60,7 +60,7 @@ class SpectralDataset(Dataset):
 
     def __len__(self):
         return len(self.data)
-    
+
 def pad_graph(node_features: torch.Tensor, eigenvects: torch.Tensor, max_graph: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Pads the node features and eigenvectors of a graph with zeros to match a maximum graph size.
@@ -186,17 +186,16 @@ def collate_spectral_dataset(batch):
     # Pad the sequences with zeros
     padded_node_features = pad_sequence(node_features, batch_first=True, padding_value=0)
 
-    # pad eigenvectors for batching
     padded_eigenvectors = torch.zeros((batch_size, max_graph, max_graph))
-    for i, ev in enumerate(eigenvectors):
-        padded_eigenvectors[i, :ev.size(0), :ev.size(1)] = ev
-
-    # Define attention mask w.r.t padding
     attention_masks = torch.zeros((batch_size,
                                    max_graph,
                                    max_graph))
-    for i, count in enumerate(num_nodes):
-        attention_masks[i, :count, :count] = 1
+
+    # pad eigenvectors for batching and construct attention mask accordingly
+    for i, ev_size in enumerate(zip(eigenvectors, num_nodes)):
+        ev, size = ev_size
+        padded_eigenvectors[i, :size, :size] = ev
+        attention_masks[i, :size, :size] = 1
 
     return (padded_node_features, padded_eigenvectors, 
             attention_masks, torch.concat(labels).flatten())
