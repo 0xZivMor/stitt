@@ -12,6 +12,7 @@ from utils import (
     collate_spectral_dataset_no_eigenvects,
     collate_spectral_dataset
 )
+from loss import FocalLoss
 
 from transformers import get_linear_schedule_with_warmup
 import argparse
@@ -36,12 +37,14 @@ def main(args):
     model_path = f"{args.name}.pt"
     upsample = args.upsample
     checkpoint_interval = args.checkpoints
+    no_eigenvects = args.no_eigenvects
+    
 
     print("Training parameters:")
     for arg in vars(args):
         print(f"{arg}: {getattr(args, arg)}")
     print(f"max grpah: {max_graph}, device: {device}")
-    train_spect_ds = create_spectral_dataset(dataset[idx["train"]], upsample=upsample)
+    train_spect_ds = torch.load("spectral_ds_train_noupsample.pt")
     
     
     model = StittGraphClassifier(
@@ -55,12 +58,16 @@ def main(args):
         device=device,
     )
 
+    if no_eigenvects:
+        collate = collate_spectral_dataset_no_eigenvects
+    else:
+        collate = collate_spectral_dataset
 
     train_loader = DataLoader(
         train_spect_ds,
         batch_size=batch_size,
         shuffle=True,
-        collate_fn=collate_spectral_dataset,
+        collate_fn=collate,
     )
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=0)
@@ -100,6 +107,7 @@ if __name__ == "__main__":
     parser.add_argument('--lr', type=float, default=5e-5, help='Learning rate')
     parser.add_argument('--name', type=str, default='stitt', help='Experiment name')
     parser.add_argument('--checkpoints', type=int, default=0, help='Save model at intervals')
+    parser.add_argument('--no_eigenvects', action='store_true', help='Do not use eigenvectors')
 
     args, unknown = parser.parse_known_args()
     parser.add_argument('--upsample', type=int, nargs=args.classes, default=[0] * args.classes)

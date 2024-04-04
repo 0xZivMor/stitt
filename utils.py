@@ -1,9 +1,12 @@
 import torch
 import torch_geometric as pyg
 import scipy.sparse as sp
+import numpy as np
 
 from typing import Optional, Iterable, Tuple
 from tqdm import tqdm
+import glob
+import re
 
 from ogb.graphproppred import Evaluator
 
@@ -261,7 +264,7 @@ def permute_edge_index(edge_index: torch.Tensor, perm: torch.Tensor) -> torch.Te
     permuted_edge_index = torch.stack([permuted_row, permuted_col], dim=0)
     return permuted_edge_index
 
-def evaluate_model(model: torch.nn.Module, dataset: Iterable, batch_size: Optional[int]=32):
+def evaluate_model(model: torch.nn.Module, dataset: Iterable, batch_size: Optional[int]=32, no_eigenvects: Optional[bool] = False):
 
     device = torch.device("cuda")
 
@@ -276,7 +279,11 @@ def evaluate_model(model: torch.nn.Module, dataset: Iterable, batch_size: Option
         for batch in tqdm(val_loader):
             features, eigvects, mask, labels = batch
             features = features.to(device)
-            eigvects = eigvects.to(device)
+            
+            if no_eigenvects:
+                eigvects = torch.zeros_like(eigvects, device=device)
+            else:
+                eigvects = eigvects.to(device)
             mask = mask.to(device)
             labels = labels.to(device)
 
@@ -333,13 +340,13 @@ class Trainer(object):
                 features = features.to(self.device)
                 attn_mask = attn_mask.to(self.device)
                 labels = labels.flatten().to(self.device)
-                
-                # Discard eigenvectors encoding if explicitly requested 
+
+                # Discard eigenvectors encoding if explicitly requested
                 if self.use_eigenvects:
                     eigvects = eigvects.to(self.device)
                 else:
                     eigvects = torch.zeros_like(eigvects).to(self.device)
-                
+
                 self.optimizer.zero_grad()
 
                 # Forward pass
@@ -360,6 +367,5 @@ class Trainer(object):
                 torch.save(self.model, f"{self.experiment_name}_epoch{epoch+1}.pt")
                 print("Saved checkpoint")
             print(f"Epoch {epoch+1} completed")
-            
 
         self.writer.close()  # Close the SummaryWriter
