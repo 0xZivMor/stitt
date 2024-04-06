@@ -5,15 +5,12 @@ import numpy as np
 
 from typing import Optional, Iterable, Tuple
 from tqdm import tqdm
-import glob
-import re
 
 from ogb.graphproppred import Evaluator
 
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
 
-from torch.utils.tensorboard import SummaryWriter
 
 from sys import getsizeof as gso
 
@@ -117,15 +114,15 @@ def create_spectral_dataset(dataset: pyg.data.Dataset, upsample: Optional[Iterab
     # Iterate over each graph in the dataset
     for graph in tqdm(iter(dataset), total=len(dataset), desc="Creating Spectral Dataset"):
 
+        _, eigenvects = get_laplacian_eig(graph)
+        
         if not upsample or not all(upsample):
-            _, eigenvects = get_laplacian_eig(graph)
             data.append((graph.x, eigenvects, graph.y, graph.num_nodes))
         else:
             # Upsample the graph based on the specified number of times
             for _ in range(upsample[graph.y]):
-                permuted_graph = permute_graph(graph)
-                _, eigenvects = get_laplacian_eig(permuted_graph)
-                data.append((permuted_graph.x, eigenvects, graph.y, graph.num_nodes))
+                permuted_graph, perm = permute_graph(graph, True)
+                data.append((permuted_graph.x, eigenvects[perm, :], graph.y, graph.num_nodes))
 
     return SpectralDataset(data)
 
@@ -220,29 +217,35 @@ def collate_spectral_dataset_no_eigenvects(batch):
     return (collated[0], torch.zeros_like(collated[1]), collated[2], collated[3])
 
 
-def permute_graph(graph: pyg.data.Data) -> pyg.data.Data:
+def permute_graph(graph: pyg.data.Data, return_perm: Optional[bool]=True) -> pyg.data.Data:
     """
-    Permutes the nodes of a given PyTorch Geometric graph.
-    
-    IMPORTANT: this method discards the original graph's edge features
-    and don't include them in the permutated graph.
+    Permutes the given graph by randomly shuffling the node features and edge indices.
 
     Args:
-        graph (pyg.data.Data): The input graph.
+        graph (pyg.data.Data): The input graph to be permuted.
+        return_perm (bool, optional): Whether to return the permutation indices. 
+                                      Defaults to True.
 
     Returns:
-        pyg.data.Data: The permuted graph.
+        pyg.data.Data: The permuted graph with shuffled node features and edge indices.
+        Optional[torch.Tensor]: The permutation indices if `return_perm` is True, else None.
     """
+
     perm = torch.randperm(graph.num_nodes)
     
     # Permute the node features
     permuted_x = graph.x[perm]
-    # Permute the edge indices
     
+    # Permute the edge indices
     permuted_edge_index = permute_edge_index(graph.edge_index, perm)
+    
     # Create the permuted graph
     permuted_graph = pyg.data.Data(x=permuted_x, y=graph.y, edge_index=permuted_edge_index)
-    return permuted_graph
+    
+    if return_perm:
+        return permuted_graph, perm
+    else:
+        return permuted_graph
 
 def permute_edge_index(edge_index: torch.Tensor, perm: torch.Tensor) -> torch.Tensor:
     """
@@ -268,9 +271,15 @@ def evaluate_model(model: torch.nn.Module, dataset: Iterable, batch_size: Option
 
     device = torch.device("cuda")
 
-    val_loader = DataLoader(
-        dataset, batch_size=batch_size, collate_fn=collate_spectral_dataset
-    )
+    if isinstance(dataset, Dataset):
+        val_loader = DataLoader(
+            dataset, batch_size=batch_size, collate_fn=collate_spectral_dataset
+        )
+    elif isinstance(dataset, DataLoader):
+        val_loader = dataset
+    else:
+        raise ValueError("dataset must be an instance of Dataset or DataLoader")
+    
     evaluator = Evaluator(name="ogbg-molhiv")
     y_true = []
     y_pred = []
