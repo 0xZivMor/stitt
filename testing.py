@@ -1,4 +1,4 @@
-from ogb.graphproppred import PygGraphPropPredDataset, Evaluator
+from ogb.graphproppred import PygGraphPropPredDataset
 import torch
 import torch.nn as nn
 
@@ -8,11 +8,10 @@ from torch.utils.data import DataLoader
 from stitt import Stitt, StittGraphClassifier
 from utils import (
     create_spectral_dataset,
-    Trainer,
     collate_spectral_dataset_no_eigenvects,
-    collate_spectral_dataset
+    collate_spectral_dataset,
 )
-from loss import FocalLoss
+from trainer import Trainer
 
 from transformers import get_linear_schedule_with_warmup
 import argparse
@@ -20,8 +19,9 @@ import argparse
 
 def main(args):
     dataset = PygGraphPropPredDataset(name="ogbg-molhiv")
-    idx = dataset.get_idx_split()
     max_graph = max([graph.num_nodes for graph in dataset])
+    del(dataset)
+    
     device = torch.device("cuda")
 
     batch_size = args.batch_size
@@ -35,18 +35,15 @@ def main(args):
     n_classes = args.classes
     lr = args.lr
     model_path = f"{args.name}.pt"
-    upsample = args.upsample
     checkpoint_interval = args.checkpoints
     no_eigenvects = args.no_eigenvects
-    
 
     print("Training parameters:")
     for arg in vars(args):
         print(f"{arg}: {getattr(args, arg)}")
-    print(f"max grpah: {max_graph}, device: {device}")
-    train_spect_ds = torch.load("spectral_ds_train_noupsample.pt")
-    
-    
+    train_spect_ds = torch.load(args.train_dataset)
+    val_ds = torch.load(args.val_dataset)
+
     model = StittGraphClassifier(
         d_input=d_input,
         d_attn=d_attn,
@@ -68,7 +65,14 @@ def main(args):
         batch_size=batch_size,
         shuffle=True,
         collate_fn=collate,
+        pin_memory=True
     )
+
+    val_loader = DataLoader(
+        val_ds, batch_size=batch_size, collate_fn=collate, pin_memory=True,
+        num_workers=2
+    )
+
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=0)
 
@@ -89,10 +93,10 @@ def main(args):
         checkpoint_interval=checkpoint_interval
     )
 
-    trainer.train(train_loader, n_epochs)
+    trainer.train(train_loader, val_loader, n_epochs)
 
     torch.save(model, model_path)
-  
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Script description')
     parser.add_argument('--batch_size', type=int, default=32, help='Batch size')
@@ -108,9 +112,8 @@ if __name__ == "__main__":
     parser.add_argument('--name', type=str, default='stitt', help='Experiment name')
     parser.add_argument('--checkpoints', type=int, default=0, help='Save model at intervals')
     parser.add_argument('--no_eigenvects', action='store_true', help='Do not use eigenvectors')
-
-    args, unknown = parser.parse_known_args()
-    parser.add_argument('--upsample', type=int, nargs=args.classes, default=[0] * args.classes)
-    args = parser.parse_args(unknown, namespace=args)
+    parser.add_argument('--train_dataset', type=str, help='Path of training dataset file')
+    parser.add_argument('--val_dataset', type=str, help='Path of dataset file')
+    args = parser.parse_args()
     
     main(args)
