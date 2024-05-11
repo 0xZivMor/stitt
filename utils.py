@@ -269,7 +269,11 @@ def permute_edge_index(edge_index: torch.Tensor, perm: torch.Tensor) -> torch.Te
 
 def evaluate_model(model: torch.nn.Module, dataset: Iterable, batch_size: Optional[int]=32, no_eigenvects: Optional[bool] = False):
 
-    device = torch.device("cuda")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+
+    if torch.backends.mps.is_available():
+        device = torch.device("mps")
 
     if isinstance(dataset, Dataset):
         val_loader = DataLoader(

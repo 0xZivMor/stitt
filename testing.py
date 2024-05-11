@@ -1,7 +1,7 @@
 from ogb.graphproppred import PygGraphPropPredDataset
 import torch
 import torch.nn as nn
-
+from gat import GatGraphClassifier
 
 from torch.utils.data import DataLoader
 
@@ -22,7 +22,12 @@ def main(args):
     max_graph = max([graph.num_nodes for graph in dataset])
     del(dataset)
     
-    device = torch.device("cuda")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+
+    if torch.backends.mps.is_available():
+        device = torch.device("mps")
+
 
     batch_size = args.batch_size
     n_heads = args.heads
@@ -37,6 +42,7 @@ def main(args):
     model_path = f"{args.name}.pt"
     checkpoint_interval = args.checkpoints
     no_eigenvects = args.no_eigenvects
+    model_arch = args.model_arch
 
     print("Training parameters:")
     for arg in vars(args):
@@ -44,16 +50,32 @@ def main(args):
     train_spect_ds = torch.load(args.train_dataset)
     val_ds = torch.load(args.val_dataset)
 
-    model = StittGraphClassifier(
-        d_input=d_input,
-        d_attn=d_attn,
-        d_ffn=d_ffn,
-        max_graph=max_graph,
-        n_heads=n_heads,
-        n_layers=n_layers,
-        n_classes=n_classes,
-        device=device,
-    )
+    if model_arch == "stitt":
+        model = StittGraphClassifier(
+            d_input=d_input,
+            d_attn=d_attn,
+            d_ffn=d_ffn,
+            max_graph=max_graph,
+            n_heads=n_heads,
+            n_layers=n_layers,
+            n_classes=n_classes,
+            device=device,
+        )
+
+    elif model_arch == "gat" :
+        model = GatGraphClassifier(
+            d_input=d_input,
+            d_attn=d_attn,
+            d_ffn=d_ffn,
+            max_graph=max_graph,
+            n_heads=n_heads,
+            n_layers=n_layers,
+            n_classes=n_classes,
+            device=device,
+        )
+
+    else:
+        raise ValueError("Model architecture not supported")
 
     if no_eigenvects:
         collate = collate_spectral_dataset_no_eigenvects
@@ -114,6 +136,7 @@ if __name__ == "__main__":
     parser.add_argument('--no_eigenvects', action='store_true', help='Do not use eigenvectors')
     parser.add_argument('--train_dataset', type=str, help='Path of training dataset file')
     parser.add_argument('--val_dataset', type=str, help='Path of dataset file')
+    parser.add_argument('--model_arch',type=str,default='stitt', help='model architecture')
     args = parser.parse_args()
     
     main(args)
