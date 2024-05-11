@@ -133,7 +133,7 @@ if __name__ == "__main__":
     parser.add_argument('--lr', type=float, default=5e-5, help='Learning rate')
     parser.add_argument('--name', type=str, default='stitt', help='Experiment name')
     parser.add_argument('--checkpoints', type=int, default=0, help='Save model at intervals')
-    parser.add_argument('--no_eigenvects', action='store_true', help='Do not use eigenvectors')
+    parser.add_argument('--no_eigenvects', action='store_true',default=False, help='Do not use eigenvectors')
     parser.add_argument('--train_dataset', type=str, help='Path of training dataset file')
     parser.add_argument('--val_dataset', type=str, help='Path of dataset file')
     parser.add_argument('--model_arch',type=str,default='stitt', help='model architecture')
