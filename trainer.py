@@ -54,22 +54,24 @@ class Trainer(object):
         total_steps = 0
 
         for epoch in range(num_epochs):
-            for features, eigvects, attn_mask, labels in tqdm(train_loader):
-                features = features.to(self.device)
-                attn_mask = attn_mask.to(self.device)
-                labels = labels.flatten().to(self.device)
+            for current_batch in tqdm(train_loader):
+                # our model does not use edge_features so we don't use it at all.
+                edges_connectivity, edge_features, nodes_features, graph_labels, _ , _ , _ = current_batch
+                nodes_features = nodes_features[1].to(self.device) # extracting only the tenzor from the object
+                edges_connectivity = edges_connectivity[1].to(self.device) # extracting only the tenzor from the object
+                graph_labels = graph_labels[1].flatten().to(self.device)
 
-                # Discard eigenvectors encoding if explicitly requested
-                if self.use_eigenvects:
-                    eigvects = eigvects.to(self.device)
-                else:
-                    eigvects = torch.zeros_like(eigvects).to(self.device)
+                # # Discard eigenvectors encoding if explicitly requested
+                # if self.use_eigenvects:
+                #     eigvects = eigvects.to(self.device)
+                # else:
+                #     eigvects = torch.zeros_like(eigvects).to(self.device)
 
                 self.optimizer.zero_grad()
 
                 # Forward pass
-                outputs = self.model(features, eigvects, attn_mask)
-                loss = self.criterion(outputs, labels)
+                outputs = self.model(nodes_features, edges_connectivity)
+                loss = self.criterion(outputs, graph_labels)
 
                 # Backward and optimize
                 loss.backward()

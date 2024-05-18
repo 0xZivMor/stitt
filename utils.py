@@ -8,7 +8,10 @@ from tqdm import tqdm
 
 from ogb.graphproppred import Evaluator
 
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
+from torch_geometric.loader import DataLoader
+
+
 from torch.nn.utils.rnn import pad_sequence
 
 
@@ -289,18 +292,13 @@ def evaluate_model(model: torch.nn.Module, dataset: Iterable, batch_size: Option
     y_pred = []
 
     with torch.no_grad():
-        for batch in tqdm(val_loader):
-            features, eigvects, mask, labels = batch
-            features = features.to(device)
-            
-            if no_eigenvects:
-                eigvects = torch.zeros_like(eigvects, device=device)
-            else:
-                eigvects = eigvects.to(device)
-            mask = mask.to(device)
-            labels = labels.to(device)
+        for current_batch in tqdm(val_loader):
+            edge_index, edge_attr, x, y, num_nodes, batch, ptr = current_batch
+            features = x.to(device)
+            attn_mask = edge_index.to(device)
+            labels = y.flatten().to(device)
 
-            outputs = model(features, eigvects, mask)
+            outputs = model(features, attn_mask)
             predicted = torch.argmax(outputs, dim=1)
 
             y_true.append(labels)

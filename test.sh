@@ -15,12 +15,12 @@ parser() {
     local lr=0.00005
     local name='stitt'
     local checkpoints=0
-    local train_dataset='dataset/ogbg_molhiv/processed/pre_transform.pt'
-    local val_dataset='dataset/ogbg_molhiv/processed/pre_transform.pt'
+    local train_dataset=''
+    local val_dataset=''
     local model_arch='gat'
 
     # Call the Python script with the parsed arguments
-    python3 testing.py \
+    python3 -m pdb testing.py \
         --batch_size "$batch_size" \
         --heads "$heads" \
         --layers "$layers" \
