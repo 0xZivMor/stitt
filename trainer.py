@@ -55,12 +55,6 @@ class Trainer(object):
 
         for epoch in range(num_epochs):
             for data in tqdm(train_loader):
-                # our model does not use edge_features so we don't use it at all.
-                # edges_connectivity, edge_features, nodes_features, graph_labels, _ , _ , _ = current_batch
-                # nodes_features = nodes_features[1].to(self.device) # extracting only the tenzor from the object
-                # edges_connectivity = edges_connectivity[1].to(self.device) # extracting only the tenzor from the object
-                # graph_labels = graph_labels[1].flatten().to(self.device)
-
                 # # Discard eigenvectors encoding if explicitly requested
                 # if self.use_eigenvects:
                 #     eigvects = eigvects.to(self.device)
@@ -77,7 +71,6 @@ class Trainer(object):
                 loss.backward()
                 self.optimizer.step()
                 self.scheduler.step()
-
                 total_steps += 1
 
                 # Log the loss to TensorBoard

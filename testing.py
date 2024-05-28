@@ -2,22 +2,19 @@ from ogb.graphproppred import PygGraphPropPredDataset
 import torch
 import torch.nn as nn
 from gat import GatGraphClassifier
-
 from torch_geometric.loader import DataLoader
-# from torch.utils.data import DataLoader
-
 from stitt import Stitt, StittGraphClassifier
+from trainer import Trainer
+from transformers import get_linear_schedule_with_warmup
+import argparse
+import os
 from utils import (
     create_spectral_dataset,
     collate_spectral_dataset_no_eigenvects,
     collate_spectral_dataset,
     collate_dataset_for_gat
 )
-from trainer import Trainer
 
-from transformers import get_linear_schedule_with_warmup
-import argparse
-import os
 os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1' #for using mps on mac with sparse methods
 
 def main(args):
@@ -107,7 +104,7 @@ def main(args):
 
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=0)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 
     training_steps = n_epochs * len(train_loader)
     scheduler = get_linear_schedule_with_warmup(
@@ -132,16 +129,16 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Script description')
-    parser.add_argument('--batch_size', type=int, default=8, help='Batch size')
-    parser.add_argument('--heads', type=int, default=4, help='Number of attention heads')
-    parser.add_argument('--layers', type=int, default=4, help='Number of transformer layers')
-    parser.add_argument('--d_input', type=int, default=64, help='Input dimension')
+    parser.add_argument('--batch_size', type=int, default=128, help='Batch size')
+    parser.add_argument('--heads', type=int, default=8, help='Number of attention heads')
+    parser.add_argument('--layers', type=int, default=2, help='Number of transformer layers')
+    parser.add_argument('--d_input', type=int, default=128, help='Input dimension')
     parser.add_argument('--d_attn', type=int, default=256, help='Attention dimension')
     parser.add_argument('--d_ffn', type=int, default=128, help='Feed-forward network dimension')
-    parser.add_argument('--epochs', type=int, default=3, help='Number of epochs')
+    parser.add_argument('--epochs', type=int, default=5, help='Number of epochs')
     parser.add_argument('--warmup', type=float, default=0.1, help='Warmup ratio')
     parser.add_argument('--classes', type=int, default=2, help='Number of classes')
-    parser.add_argument('--lr', type=float, default=5e-5, help='Learning rate')
+    parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
     parser.add_argument('--name', type=str, default='gat', help='Experiment name')
     parser.add_argument('--checkpoints', type=int, default=0, help='Save model at intervals')
     parser.add_argument('--no_eigenvects', action='store_true',default=False, help='Do not use eigenvectors')

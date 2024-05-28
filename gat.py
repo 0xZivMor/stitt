@@ -51,7 +51,7 @@ class GatGraphClassifier(nn.Module):
     
 class GAT(torch.nn.Module):
 
-    def __init__(self,d_hidden, n_layers, n_heads,device, dropout=0.6, activiation = nn.GELU()):
+    def __init__(self,d_hidden, n_layers, n_heads,device, dropout=0.3, activiation = nn.GELU()):
         super().__init__()
         self.d_hidden = d_hidden
         self.n_layers = n_layers

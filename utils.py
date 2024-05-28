@@ -308,18 +308,15 @@ def evaluate_model(model: torch.nn.Module, val_loader: Iterable, batch_size: Opt
     y_true = []
     y_pred = []
 
+    model.eval()
+
     with torch.no_grad():
-        for current_batch in tqdm(val_loader):
+        for data in tqdm(val_loader):
 
-            edges_connectivity, edge_features, nodes_features, graph_labels, _ , _ , _ = current_batch
-            nodes_features = nodes_features[1].to(device) # extracting only the tenzor from the object
-            edges_connectivity = edges_connectivity[1].to(device) # extracting only the tenzor from the object
-            graph_labels = graph_labels[1].flatten().to(device).type(torch.float32)
-
-            outputs = model(nodes_features, edges_connectivity)
+            outputs = model(data.x, data.edge_index, data.batch)
             predicted = torch.argmax(outputs, dim=1)
 
-            y_true.append(graph_labels)
+            y_true.append(data.y.flatten())
             y_pred.append(predicted)
 
     y_true = torch.concat(y_true).unsqueeze(1)
