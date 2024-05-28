@@ -6,6 +6,7 @@ from torch_geometric.loader import DataLoader
 from stitt import Stitt, StittGraphClassifier
 from trainer import Trainer
 from transformers import get_linear_schedule_with_warmup
+from torchsampler import ImbalancedDatasetSampler
 import argparse
 import os
 from utils import (
@@ -19,6 +20,7 @@ os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1' #for using mps on mac with spars
 
 def main(args):
     dataset = PygGraphPropPredDataset(name="ogbg-molhiv")
+    
     max_graph = max([graph.num_nodes for graph in dataset])
 
     split_idx = dataset.get_idx_split() 
@@ -48,6 +50,15 @@ def main(args):
     checkpoint_interval = args.checkpoints
     no_eigenvects = args.no_eigenvects
     model_arch = args.model_arch
+
+    # # Calculate class weights
+    # labels = [data.y.item() for data in dataset]
+    # class_counts = torch.bincount(torch.tensor(labels))
+    # class_weights = 1. / class_counts.float()
+
+    # # Assign weights to each sample
+    # sample_weights = [class_weights[label] for label in labels]
+    # sampler = torch.utils.data.WeightedRandomSampler(sample_weights, len(dataset))
 
     # print("Training parameters:")
     # for arg in vars(args):
@@ -82,7 +93,8 @@ def main(args):
         )
 
         collate = collate_dataset_for_gat
-        train_loader = DataLoader(dataset[split_idx['train']], batch_size=batch_size, shuffle=True)
+        balanced_sampler = ImbalancedDatasetSampler(dataset[split_idx['train']], labels= [data.y.item() for data in dataset[split_idx['train']]])
+        train_loader = DataLoader(dataset[split_idx['train']],batch_size=batch_size, sampler=balanced_sampler)
         val_loader = DataLoader(dataset[split_idx['valid']], batch_size=batch_size, shuffle=False)
 
     else:
@@ -132,10 +144,10 @@ if __name__ == "__main__":
     parser.add_argument('--batch_size', type=int, default=128, help='Batch size')
     parser.add_argument('--heads', type=int, default=8, help='Number of attention heads')
     parser.add_argument('--layers', type=int, default=2, help='Number of transformer layers')
-    parser.add_argument('--d_input', type=int, default=128, help='Input dimension')
+    parser.add_argument('--d_input', type=int, default=256, help='Input dimension')
     parser.add_argument('--d_attn', type=int, default=256, help='Attention dimension')
     parser.add_argument('--d_ffn', type=int, default=128, help='Feed-forward network dimension')
-    parser.add_argument('--epochs', type=int, default=5, help='Number of epochs')
+    parser.add_argument('--epochs', type=int, default=10, help='Number of epochs')
     parser.add_argument('--warmup', type=float, default=0.1, help='Warmup ratio')
     parser.add_argument('--classes', type=int, default=2, help='Number of classes')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')

@@ -323,6 +323,6 @@ def evaluate_model(model: torch.nn.Module, val_loader: Iterable, batch_size: Opt
     y_pred = torch.concat(y_pred).unsqueeze(1)
 
     roc_auc = evaluator.eval({"y_true": y_true, "y_pred": y_pred})["rocauc"]
+    print(f"sum of expected 1 labels is {torch.sum(y_true)}, sum of predicted 1 labels is {torch.sum(y_pred)}")
     print(f"ROC AUC: {roc_auc}")
     return roc_auc
-
