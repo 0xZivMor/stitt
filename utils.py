@@ -219,6 +219,20 @@ def collate_spectral_dataset_no_eigenvects(batch):
     # Return the collated dataset without eigenvectors
     return (collated[0], torch.zeros_like(collated[1]), collated[2], collated[3])
 
+def collate_dataset_for_gat(batch):
+    """
+    Args:
+        batch (list): A list of samples in the dataset.
+
+    Returns:
+        tuple: A tuple containing the collated dataset for gat
+    """
+    
+    collated = collate_spectral_dataset(batch)
+    
+    # Return the collated dataset without eigenvectors
+    return (collated[0], collated[2], collated[3])
+
 
 def permute_graph(graph: pyg.data.Data, return_perm: Optional[bool]=True) -> pyg.data.Data:
     """
@@ -270,22 +284,25 @@ def permute_edge_index(edge_index: torch.Tensor, perm: torch.Tensor) -> torch.Te
     permuted_edge_index = torch.stack([permuted_row, permuted_col], dim=0)
     return permuted_edge_index
 
-def evaluate_model(model: torch.nn.Module, dataset: Iterable, batch_size: Optional[int]=32, no_eigenvects: Optional[bool] = False):
+def evaluate_model(model: torch.nn.Module, val_loader: Iterable, batch_size: Optional[int]=32, no_eigenvects: Optional[bool] = False):
 
     if torch.cuda.is_available():
         device = torch.device("cuda")
 
     if torch.backends.mps.is_available():
-        device = torch.device("mps")
+        # device = torch.device("mps")
+        # print("Using MPS")
+        device = torch.device("cpu")
+        print("Using CPU")
 
-    if isinstance(dataset, Dataset):
-        val_loader = DataLoader(
-            dataset, batch_size=batch_size, collate_fn=collate_spectral_dataset
-        )
-    elif isinstance(dataset, DataLoader):
-        val_loader = dataset
-    else:
-        raise ValueError("dataset must be an instance of Dataset or DataLoader")
+    # if isinstance(dataset, Dataset):
+    #     val_loader = DataLoader(
+    #         dataset, batch_size=batch_size, collate_fn=collate_spectral_dataset
+    #     )
+    # elif isinstance(dataset, DataLoader):
+    #     val_loader = dataset
+    # else:
+    #     raise ValueError("dataset must be an instance of Dataset or DataLoader")
     
     evaluator = Evaluator(name="ogbg-molhiv")
     y_true = []
@@ -293,20 +310,22 @@ def evaluate_model(model: torch.nn.Module, dataset: Iterable, batch_size: Option
 
     with torch.no_grad():
         for current_batch in tqdm(val_loader):
-            edge_index, edge_attr, x, y, num_nodes, batch, ptr = current_batch
-            features = x.to(device)
-            attn_mask = edge_index.to(device)
-            labels = y.flatten().to(device)
 
-            outputs = model(features, attn_mask)
+            edges_connectivity, edge_features, nodes_features, graph_labels, _ , _ , _ = current_batch
+            nodes_features = nodes_features[1].to(device) # extracting only the tenzor from the object
+            edges_connectivity = edges_connectivity[1].to(device) # extracting only the tenzor from the object
+            graph_labels = graph_labels[1].flatten().to(device).type(torch.float32)
+
+            outputs = model(nodes_features, edges_connectivity)
             predicted = torch.argmax(outputs, dim=1)
 
-            y_true.append(labels)
+            y_true.append(graph_labels)
             y_pred.append(predicted)
 
     y_true = torch.concat(y_true).unsqueeze(1)
     y_pred = torch.concat(y_pred).unsqueeze(1)
 
     roc_auc = evaluator.eval({"y_true": y_true, "y_pred": y_pred})["rocauc"]
+    print(f"ROC AUC: {roc_auc}")
     return roc_auc
 

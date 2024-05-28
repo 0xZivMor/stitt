@@ -30,7 +30,7 @@ class Trainer(object):
         use_eigenvects=True,
         checkpoint_interval=0,
     ):
-        self.model = model
+        self.model = model.to(device)
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.criterion = criterion
@@ -54,12 +54,12 @@ class Trainer(object):
         total_steps = 0
 
         for epoch in range(num_epochs):
-            for current_batch in tqdm(train_loader):
+            for data in tqdm(train_loader):
                 # our model does not use edge_features so we don't use it at all.
-                edges_connectivity, edge_features, nodes_features, graph_labels, _ , _ , _ = current_batch
-                nodes_features = nodes_features[1].to(self.device) # extracting only the tenzor from the object
-                edges_connectivity = edges_connectivity[1].to(self.device) # extracting only the tenzor from the object
-                graph_labels = graph_labels[1].flatten().to(self.device)
+                # edges_connectivity, edge_features, nodes_features, graph_labels, _ , _ , _ = current_batch
+                # nodes_features = nodes_features[1].to(self.device) # extracting only the tenzor from the object
+                # edges_connectivity = edges_connectivity[1].to(self.device) # extracting only the tenzor from the object
+                # graph_labels = graph_labels[1].flatten().to(self.device)
 
                 # # Discard eigenvectors encoding if explicitly requested
                 # if self.use_eigenvects:
@@ -70,8 +70,8 @@ class Trainer(object):
                 self.optimizer.zero_grad()
 
                 # Forward pass
-                outputs = self.model(nodes_features, edges_connectivity)
-                loss = self.criterion(outputs, graph_labels)
+                outputs = self.model(data.x, data.edge_index, data.batch)
+                loss = self.criterion(outputs, data.y.flatten())
 
                 # Backward and optimize
                 loss.backward()
@@ -87,7 +87,7 @@ class Trainer(object):
                 torch.save(self.model, f"{self.experiment_name}_epoch{epoch+1}.pt")
                 print("Saved checkpoint")
 
-            auroc = evaluate_model(self.model, val_loader, 32, not self.use_eigenvects)
+            auroc = evaluate_model(self.model, val_loader, 1, not self.use_eigenvects)
 
             self.writer.add_scalar("AUROC/validation", auroc, total_steps)
 
