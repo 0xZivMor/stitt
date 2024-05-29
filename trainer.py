@@ -55,6 +55,7 @@ class Trainer(object):
 
         for epoch in range(num_epochs):
             for data in tqdm(train_loader):
+                data.to(self.device)
                 # # Discard eigenvectors encoding if explicitly requested
                 # if self.use_eigenvects:
                 #     eigvects = eigvects.to(self.device)

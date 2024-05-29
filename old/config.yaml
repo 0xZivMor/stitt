@@ -1,0 +1,16 @@
+batch_size: 32
+heads: 2
+layers: 4
+d_input: 256
+d_attn: 256
+d_ffn: 128
+epochs: 5
+warmup: 0.1
+classes: 2
+lr: 0.00005
+name: gat
+checkpoints: 0
+train_dataset: ''
+val_dataset: ''
+model_arch: gat
+d_atom_emb : 100

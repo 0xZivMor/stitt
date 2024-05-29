@@ -219,19 +219,6 @@ def collate_spectral_dataset_no_eigenvects(batch):
     # Return the collated dataset without eigenvectors
     return (collated[0], torch.zeros_like(collated[1]), collated[2], collated[3])
 
-def collate_dataset_for_gat(batch):
-    """
-    Args:
-        batch (list): A list of samples in the dataset.
-
-    Returns:
-        tuple: A tuple containing the collated dataset for gat
-    """
-    
-    collated = collate_spectral_dataset(batch)
-    
-    # Return the collated dataset without eigenvectors
-    return (collated[0], collated[2], collated[3])
 
 
 def permute_graph(graph: pyg.data.Data, return_perm: Optional[bool]=True) -> pyg.data.Data:
@@ -286,14 +273,9 @@ def permute_edge_index(edge_index: torch.Tensor, perm: torch.Tensor) -> torch.Te
 
 def evaluate_model(model: torch.nn.Module, val_loader: Iterable, batch_size: Optional[int]=32, no_eigenvects: Optional[bool] = False):
 
+    device = torch.device('cpu')
     if torch.cuda.is_available():
         device = torch.device("cuda")
-
-    if torch.backends.mps.is_available():
-        # device = torch.device("mps")
-        # print("Using MPS")
-        device = torch.device("cpu")
-        print("Using CPU")
 
     # if isinstance(dataset, Dataset):
     #     val_loader = DataLoader(
@@ -312,6 +294,7 @@ def evaluate_model(model: torch.nn.Module, val_loader: Iterable, batch_size: Opt
 
     with torch.no_grad():
         for data in tqdm(val_loader):
+            data = data.to(device)
 
             outputs = model(data.x, data.edge_index, data.batch)
             predicted = torch.argmax(outputs, dim=1)
