@@ -20,7 +20,7 @@ def main():
     print("Loaded dataset")
     
     # Call utils.create_spectral_dataset with the provided arguments
-    ds = utils.create_spectral_dataset(dataset[idx['train']],
+    ds = utils.create_spectral_dataset2(dataset[idx['train']],
                                        args.upsample)
     torch.save(ds, args.output)
 

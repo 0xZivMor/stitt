@@ -30,7 +30,7 @@ class Trainer(object):
         use_eigenvects=True,
         checkpoint_interval=0,
     ):
-        self.model = model
+        self.model = model.to(device)
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.criterion = criterion
@@ -54,28 +54,24 @@ class Trainer(object):
         total_steps = 0
 
         for epoch in range(num_epochs):
-            for features, eigvects, attn_mask, labels in tqdm(train_loader):
-                features = features.to(self.device)
-                attn_mask = attn_mask.to(self.device)
-                labels = labels.flatten().to(self.device)
-
-                # Discard eigenvectors encoding if explicitly requested
-                if self.use_eigenvects:
-                    eigvects = eigvects.to(self.device)
-                else:
-                    eigvects = torch.zeros_like(eigvects).to(self.device)
+            for data in tqdm(train_loader):
+                data.to(self.device)
+                # # Discard eigenvectors encoding if explicitly requested
+                # if self.use_eigenvects:
+                #     eigvects = eigvects.to(self.device)
+                # else:
+                #     eigvects = torch.zeros_like(eigvects).to(self.device)
 
                 self.optimizer.zero_grad()
 
                 # Forward pass
-                outputs = self.model(features, eigvects, attn_mask)
-                loss = self.criterion(outputs, labels)
+                outputs = self.model(data.x, data.edge_index, data.batch)
+                loss = self.criterion(outputs, data.y.flatten())
 
                 # Backward and optimize
                 loss.backward()
                 self.optimizer.step()
                 self.scheduler.step()
-
                 total_steps += 1
 
                 # Log the loss to TensorBoard
@@ -85,7 +81,7 @@ class Trainer(object):
                 torch.save(self.model, f"{self.experiment_name}_epoch{epoch+1}.pt")
                 print("Saved checkpoint")
 
-            auroc = evaluate_model(self.model, val_loader, 32, not self.use_eigenvects)
+            auroc = evaluate_model(self.model, val_loader, 1, not self.use_eigenvects)
 
             self.writer.add_scalar("AUROC/validation", auroc, total_steps)
 

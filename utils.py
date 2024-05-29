@@ -8,7 +8,10 @@ from tqdm import tqdm
 
 from ogb.graphproppred import Evaluator
 
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
+from torch_geometric.loader import DataLoader
+
+
 from torch.nn.utils.rnn import pad_sequence
 
 
@@ -217,6 +220,7 @@ def collate_spectral_dataset_no_eigenvects(batch):
     return (collated[0], torch.zeros_like(collated[1]), collated[2], collated[3])
 
 
+
 def permute_graph(graph: pyg.data.Data, return_perm: Optional[bool]=True) -> pyg.data.Data:
     """
     Permutes the given graph by randomly shuffling the node features and edge indices.
@@ -267,44 +271,41 @@ def permute_edge_index(edge_index: torch.Tensor, perm: torch.Tensor) -> torch.Te
     permuted_edge_index = torch.stack([permuted_row, permuted_col], dim=0)
     return permuted_edge_index
 
-def evaluate_model(model: torch.nn.Module, dataset: Iterable, batch_size: Optional[int]=32, no_eigenvects: Optional[bool] = False):
+def evaluate_model(model: torch.nn.Module, val_loader: Iterable, batch_size: Optional[int]=32, no_eigenvects: Optional[bool] = False):
 
-    device = torch.device("cuda")
+    device = torch.device('cpu')
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
 
-    if isinstance(dataset, Dataset):
-        val_loader = DataLoader(
-            dataset, batch_size=batch_size, collate_fn=collate_spectral_dataset
-        )
-    elif isinstance(dataset, DataLoader):
-        val_loader = dataset
-    else:
-        raise ValueError("dataset must be an instance of Dataset or DataLoader")
+    # if isinstance(dataset, Dataset):
+    #     val_loader = DataLoader(
+    #         dataset, batch_size=batch_size, collate_fn=collate_spectral_dataset
+    #     )
+    # elif isinstance(dataset, DataLoader):
+    #     val_loader = dataset
+    # else:
+    #     raise ValueError("dataset must be an instance of Dataset or DataLoader")
     
     evaluator = Evaluator(name="ogbg-molhiv")
     y_true = []
     y_pred = []
 
-    with torch.no_grad():
-        for batch in tqdm(val_loader):
-            features, eigvects, mask, labels = batch
-            features = features.to(device)
-            
-            if no_eigenvects:
-                eigvects = torch.zeros_like(eigvects, device=device)
-            else:
-                eigvects = eigvects.to(device)
-            mask = mask.to(device)
-            labels = labels.to(device)
+    model.eval()
 
-            outputs = model(features, eigvects, mask)
+    with torch.no_grad():
+        for data in tqdm(val_loader):
+            data = data.to(device)
+
+            outputs = model(data.x, data.edge_index, data.batch)
             predicted = torch.argmax(outputs, dim=1)
 
-            y_true.append(labels)
+            y_true.append(data.y.flatten())
             y_pred.append(predicted)
 
     y_true = torch.concat(y_true).unsqueeze(1)
     y_pred = torch.concat(y_pred).unsqueeze(1)
 
     roc_auc = evaluator.eval({"y_true": y_true, "y_pred": y_pred})["rocauc"]
+    print(f"sum of expected 1 labels is {torch.sum(y_true)}, sum of predicted 1 labels is {torch.sum(y_pred)}")
+    print(f"ROC AUC: {roc_auc}")
     return roc_auc
-
