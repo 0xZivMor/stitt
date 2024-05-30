@@ -276,16 +276,7 @@ def evaluate_model(model: torch.nn.Module, val_loader: Iterable, batch_size: Opt
     device = torch.device('cpu')
     if torch.cuda.is_available():
         device = torch.device("cuda")
-
-    # if isinstance(val_loader, Dataset):
-    #     val_loader = DataLoader(
-    #         val_loader, batch_size=batch_size, collate_fn=collate_spectral_dataset
-    #     )
-    # elif isinstance(val_loader, DataLoader):
-    #     val_loader = val_loader
-    # else:
-    #     raise ValueError("dataset must be an instance of Dataset or DataLoader")
-    
+            
     evaluator = Evaluator(name="ogbg-molhiv")
     y_true = []
     y_pred = []

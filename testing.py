@@ -132,7 +132,7 @@ if __name__ == "__main__":
     parser.add_argument('--name', type=str, default='gat', help='Experiment name')
     parser.add_argument('--checkpoints', type=int, default=0, help='Save model at intervals')
     parser.add_argument('--no_eigenvects', action='store_true',default=False, help='Do not use eigenvectors')
-    parser.add_argument('--train_dataset', type=str,default='./dataset/ogbg_molhiv/molhiv_spectral_dataset_val.pt', help='Path of training dataset file')
+    parser.add_argument('--train_dataset', type=str,default='./dataset/ogbg_molhiv/molhiv_spectral_dataset_train.pt', help='Path of training dataset file')
     parser.add_argument('--val_dataset', type=str,default='./dataset//ogbg_molhiv/molhiv_spectral_dataset_val.pt', help='Path of dataset file')
     parser.add_argument('--model_arch',type=str,default='gat', help='model architecture')
     args = parser.parse_args()

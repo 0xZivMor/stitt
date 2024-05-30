@@ -70,7 +70,7 @@ class Trainer(object):
                 else: #this is the gat model 
                     outputs = self.model(data.x, data.edge_index, data.batch)
                     
-                loss = self.criterion(outputs, data.y.flִatten())
+                loss = self.criterion(outputs, data.y.flatten())
 
                 # Backward and optimize
                 loss.backward()
