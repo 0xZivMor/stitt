@@ -4,7 +4,7 @@ from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
 from utils import evaluate_model
-
+from stitt import StittGraphClassifier
 
 class Trainer(object):
     """
@@ -56,17 +56,21 @@ class Trainer(object):
         for epoch in range(num_epochs):
             for data in tqdm(train_loader):
                 data.to(self.device)
-                # # Discard eigenvectors encoding if explicitly requested
-                # if self.use_eigenvects:
-                #     eigvects = eigvects.to(self.device)
-                # else:
-                #     eigvects = torch.zeros_like(eigvects).to(self.device)
-
                 self.optimizer.zero_grad()
 
                 # Forward pass
-                outputs = self.model(data.x, data.edge_index, data.batch)
-                loss = self.criterion(outputs, data.y.flatten())
+                if isinstance(self.model,StittGraphClassifier ):
+                        # Discard eigenvectors encoding if explicitly requested
+                    if self.use_eigenvects:
+                        eigvects = eigvects.to(self.device)
+                    else:
+                        eigvects = torch.zeros_like(eigvects).to(self.device)
+                    outputs = self.model(data.x, eigvects, data.edge_index)
+
+                else: #this is the gat model 
+                    outputs = self.model(data.x, data.edge_index, data.batch)
+                    
+                loss = self.criterion(outputs, data.y.flִatten())
 
                 # Backward and optimize
                 loss.backward()

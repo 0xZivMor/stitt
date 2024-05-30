@@ -1,12 +1,7 @@
 import torch
 import torch.nn as nn
 from ogb.graphproppred.mol_encoder import AtomEncoder
-from typing import Tuple, Optional, Iterable
-import torch.nn.functional as F
-from torch.nn import Linear, Dropout
-from torch_geometric.nn import GATConv, GATv2Conv
-from torch_geometric.nn import global_mean_pool
-
+from torch_geometric.nn import  GATv2Conv, global_mean_pool
 
 class GatGraphClassifier(nn.Module):
 
@@ -51,7 +46,7 @@ class GatGraphClassifier(nn.Module):
     
 class GAT(torch.nn.Module):
 
-    def __init__(self,d_hidden, n_layers, n_heads,device, dropout=0.3, activiation = nn.GELU()):
+    def __init__(self,d_hidden, n_layers, n_heads,device, dropout=0, activiation = nn.GELU()):
         super().__init__()
         self.d_hidden = d_hidden
         self.n_layers = n_layers
@@ -73,7 +68,7 @@ class GAT(torch.nn.Module):
         #return shape [sum of nodes in batch , d_hidden]
         
         for i, gat_layer in enumerate(self.gat_layers):
-            F.dropout(embeded_nodes_features, p=self.dropout, inplace=True, training=self.training)
+            nn.functional.dropout(embeded_nodes_features, p=self.dropout, inplace=True, training=self.training)
             embeded_nodes_features = gat_layer(embeded_nodes_features,edges_connectivity)
             if i < self.n_layers - 1:
                 embeded_nodes_features = self.activiation(embeded_nodes_features)

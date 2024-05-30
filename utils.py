@@ -277,12 +277,12 @@ def evaluate_model(model: torch.nn.Module, val_loader: Iterable, batch_size: Opt
     if torch.cuda.is_available():
         device = torch.device("cuda")
 
-    # if isinstance(dataset, Dataset):
+    # if isinstance(val_loader, Dataset):
     #     val_loader = DataLoader(
-    #         dataset, batch_size=batch_size, collate_fn=collate_spectral_dataset
+    #         val_loader, batch_size=batch_size, collate_fn=collate_spectral_dataset
     #     )
-    # elif isinstance(dataset, DataLoader):
-    #     val_loader = dataset
+    # elif isinstance(val_loader, DataLoader):
+    #     val_loader = val_loader
     # else:
     #     raise ValueError("dataset must be an instance of Dataset or DataLoader")
     
